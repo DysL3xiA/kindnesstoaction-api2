@@ -92,11 +92,11 @@ VALUES('Alexis', 'Schindel', 'lexichasney@gmail.com'),
 	('Harry', 'Potter', 'wizardsrcool@gmail.com'),
 	('Santa', 'Clause', 'mrkringle@yahoo.com');
 
-INSERT INTO chimes (title, coin_id)
-Values('Test Chime', 1),
-	('Kindness', 2),
-	('Hogwarts Clean Up', 2),
-	('Reindeer Food Drive', 2);
+INSERT INTO chimes (title, coin_id, description)
+Values('Test Chime', 1, null),
+	('Kindness', 2, null),
+	('Hogwarts Clean Up', 2, 'Cleaned up the Hogwarts campus'),
+	('Reindeer Food Drive', 2, 'Elves did a food drive for local reindeer in need');
 
 INSERT INTO chime_user (chime_id, user_id)
 VALUES((Select id from chimes where title = 'Test Chime'), (Select id from users where email = 'lexichasney@gmail.com')),
