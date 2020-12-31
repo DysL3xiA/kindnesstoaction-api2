@@ -23,20 +23,12 @@ const { Pool } = require('pg');
 
 // postgres database connection
 const pool = new Pool({
-  host: 'localhost',
-  user: 'kindnesstoaction',
-  database: 'kindnesstoaction',
-  password: 'Il0vezuriandkashii',
+  host: process.env.HOSTNAME,
+  user: process.env.USERNAME,
+  database: process.env.DATABASE,
+  password: process.env.PASSWORD,
   port: 5432,
-  // ssl: true,
-  // idleTimeoutMillis: 30000,
-  // connectionTimeoutMillis: 2000,
 });
-
-console.log(process.env.HOSTNAME);
-console.log(process.env.USERNAME);
-console.log(process.env.DATABASE);
-console.log(process.env.PASSWORD);
 
 //listen for request on port 3000, and as a callback function have the port listened on logged
 app.listen(port, hostname, () => {
@@ -47,20 +39,306 @@ app.get("/", function(req, res){
   res.send("Hello World test");
 });
 
-app.get("/users", function(req, res){
-  let context = {};
+app.get("/all_chimes", function(req, res){
+  //execute the query and the send the results back to the client
+  executeQuery(all_chimes, function(context){
+    res.send(context);
+  });
+});
 
-  pool.query("SELECT * from users;", (err, rows) => 
-  {
-    if(err){
-        console.log(err);
-        return;
+/**************************** Handle Descriptions *****************************/
+
+/*********************************************************
+ * Add Chime Handle
+ * 
+ * Expects Mandatory Arguments: 
+ * title
+ * coin_num
+ * first_name
+ * last_name
+ * email
+ * latitude
+ * longitude
+ * 
+ * Optional Arguments: 
+ * description
+ * image
+*********************************************************/
+
+app.post("/add_chime", function(req, res){ 
+  addIfNotExist(req.body.coin_num, [req.body.coin_num], 'coin')
+  .then((coin_id) => {
+    if (coin_id == -1){
+      res.send("Unable to insert coin");
     }
-    else{
-      result = rows.rows;
-
-      context.results = JSON.stringify(result);
-      res.send(context);
+    else {
+      // add chime and user
+      const chime_id = Promise.resolve(
+        addRelation([coin_id, req.body.title, req.body.description || 'null',
+        req.body.image || 'null'], 'chime')
+        );
+      const user_id = Promise.resolve(
+        addIfNotExist(req.body.email, [req.body.first_name, 
+          req.body.last_name, req.body.email, 'FALSE'], 'user')
+      );
+      // need to add logic to check if address exists
+      const address_id = Promise.resolve(
+        addRelation([req.body.latitude, req.body.longitude], 'address')
+      );
+      // once chime and user are added, add chime_user relation
+      Promise.all([chime_id, user_id, address_id])
+      .then((values) => {
+        console.log(values);
+        addRelation([values[0], values[1]], 'chime_user');
+        addRelation([values[0], values[2]], 'chime_address');
+      });
     }
   });
 });
+
+/*********************************************************
+ * Add Ambassador Handle
+ * 
+ * Expects Mandatory Arguments: 
+ * first_name
+ * last_name
+ * email
+*********************************************************/
+
+
+
+/************************ Query Execution Functions **************************/
+
+/*********************************************************
+addCoin: 
+Checks if coin already exists. Retrieves id if exists; adds
+new coin and returns new id if not exists
+Receives: coin number to be added
+Returns: id of coin added (or retrieved)
+*********************************************************/
+function addIfNotExist(unique_identifier, paramList, type){
+  queryCheckLookup = {
+    coin: isCoin,
+    user: isUser,
+  }
+  queryInsertLookup = {
+    coin: insertCoin,
+    user: insertUser,
+  }
+  let alreadyExists = {
+    text: queryCheckLookup[type], 
+    placeholder_arr: [unique_identifier]};
+
+  return new Promise(function(resolve, reject) {
+    parameterQuery(alreadyExists)
+    .then((row) => {
+      // if the new value already exists, then return id
+      if (row.rowCount == 1){
+        return resolve(row.rows[0].id);
+      }
+      // otherwise make the new entry
+      else {
+        let queryInsert = {
+          text: queryInsertLookup[type],
+          placeholder_arr: paramList
+        }
+        parameterQuery(queryInsert)
+        .then((row) => {
+          if (row.rowCount == 1){
+            return resolve(row.rows[0].id);
+          }
+          // return -1 in event of error inserting coin
+          else {
+            return reject(-1);
+          }
+        });
+      }
+    });
+  });
+};
+
+/*********************************************************
+addRelation: 
+Inserts a new chime associated with the coin_id passed
+as an argument
+Receives: coin_id, title, description, image
+Returns: 
+*********************************************************/
+function addRelation(params, type){
+  queryInsertLookup = {
+    chime: insertChime,
+    user: insertUser,
+    chime_user: insertChimeUser,
+    address: insertAddress,
+    chime_address: insertChimeAddress,
+  }
+  let queryInsert = {
+    text: queryInsertLookup[type],
+    placeholder_arr: params
+  }; 
+  return new Promise(function(resolve, reject) {
+    executeParameterQuery(queryInsert, function(context){
+      if (context.rowCount == 1){
+        return resolve(context.rows[0].id);
+      }
+      // return -1 in event of error inserting coin
+      else {
+        return reject(-1);
+      }
+    });
+  });
+};
+
+/*********************************************************
+executeQuery: 
+Executes the query and returns all the rows
+from the results back to the callback which well send to 
+the client
+Receives: query - query string; callback - callback function
+Returns: nothing (sends back rows to callback function)
+*********************************************************/
+function executeQuery(query, callback){
+  pool.query(query, function(err, rows){
+      if(err){
+        return console.error('Error executing query', err.stack)
+      }
+      callback(JSON.stringify(rows.rows));
+  });
+};
+
+/*********************************************************
+parameterQuery:  
+Executes a query that has parameters
+Receives: JSON object with text and placeholder_arr values
+Returns: rows (from query execution)
+*********************************************************/
+function parameterQuery(query) {
+  return new Promise(function(resolve, reject) {
+      try {
+          pool.query(query.text, query.placeholder_arr, function(err, rows, fields) {
+              if (err) {
+                  return reject(err);
+              } else {
+                  return resolve(rows);
+              }
+          });
+      } catch (err) {
+          return reject(err);
+      }
+  })
+};
+
+/*********************************************************
+executeParameterQuery:  
+Executes the query and returns all the rows
+from the results back to the callback which well send to 
+the client
+Receives: JSON object with text + placeholder_arr values, callback
+Returns: nothing (sends back rows to callback function)
+*********************************************************/
+function executeParameterQuery(query, callback) {
+  pool.query(query.text, query.placeholder_arr, function(err, rows) {
+    if (err) {
+      return console.error('Error executing query', err.stack)
+    }
+    else{
+      callback(rows);
+    }
+  });
+};
+
+/************************ Queries to run **************************/
+
+/*************************************************
+ * Returns all chimes
+*************************************************/
+let all_chimes = 
+`select 
+ch.id as chime_id,
+cc.id as coin_id,
+cc.coin_num,
+ch.title,
+u.first_name,
+u.last_name,
+u.email,
+aa.latitude,
+aa.longitude
+
+from chimes ch
+left join coins cc on ch.coin_id = cc.id
+left join chime_address ca on ca.chime_id = ch.id
+left join addresses aa on aa.id = ca.address_id
+left join chime_user cu on cu.chime_id = ch.id
+left join users u on u.id = cu.user_id`;
+
+/*************************************************
+ * Insert new coin
+*************************************************/
+let insertCoin = 
+`INSERT INTO coins (coin_num)
+VALUES ($1)
+RETURNING id;`;
+
+/*************************************************
+ * Insert new chime
+*************************************************/
+let insertChime = 
+`INSERT INTO chimes (coin_id, title, description, image)
+VALUES ($1, $2, $3, $4)
+RETURNING id;`;
+
+/*************************************************
+ * Insert new user
+*************************************************/
+let insertUser = 
+`INSERT INTO users (first_name, last_name, email, is_ambassador)
+VALUES ($1, $2, $3, $4)
+RETURNING id;`;
+
+/*************************************************
+ * Insert new address
+*************************************************/
+let insertAddress = 
+`INSERT INTO addresses (latitude, longitude)
+VALUES ($1, $2)
+RETURNING id;`;
+
+/*************************************************
+ * Insert new chime_address
+*************************************************/
+let insertChimeAddress = 
+`INSERT INTO chime_address (chime_id, address_id)
+VALUES ($1, $2)
+RETURNING id;`;
+
+/*************************************************
+ * Insert new chime_user
+*************************************************/
+let insertChimeUser = 
+`INSERT INTO chime_user (chime_id, user_id)
+VALUES ($1, $2)
+RETURNING id;`;
+
+/*************************************************
+ * Find if user exists
+*************************************************/
+let isUser = 
+`Select id FROM users where lower(email) = lower($1);`;
+
+/*************************************************
+ * Find if address exists
+*************************************************/
+let isAddress = 
+`Select id FROM addresses where latitude = $1 and longitude = $2;`;
+
+/*************************************************
+ * Find if chime exists
+*************************************************/
+let isChime = 
+`Select id FROM chimes where title = $1;`;
+
+/*************************************************
+ * Find if coin exists
+*************************************************/
+let isCoin = 
+`Select id FROM coins where coin_num = $1;`;
