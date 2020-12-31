@@ -105,7 +105,7 @@ VALUES((Select id from chimes where title = 'Test Chime'), (Select id from users
 	((Select id from chimes where title = 'Kindness'), (Select id from users where email = 'mrkringle@yahoo.com'));
 
 INSERT INTO addresses (latitude, longitude)
-VALUES(47.608013, -122.335167),
+VALUES(29.761993, -95.366302),
 	(51.5361, -0.1251),
 	(90.0000, 0.0000);
 
