@@ -1,4 +1,5 @@
 # kindnesstoaction-api2
 
-db user: kindnesstoaction \n
+db user: kindnesstoaction
+
 app user: developer
