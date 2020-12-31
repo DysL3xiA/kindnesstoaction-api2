@@ -101,8 +101,8 @@ Values('Test Chime', 1),
 INSERT INTO chime_user (chime_id, user_id)
 VALUES((Select id from chimes where title = 'Test Chime'), (Select id from users where email = 'lexichasney@gmail.com')),
 	((Select id from chimes where title = 'Kindness'), (Select id from users where email = 'wyicked@gmail.com')),
-	((Select id from chimes where title = 'Kindness'), (Select id from users where email = 'wizardsrcool@gmail.com')),
-	((Select id from chimes where title = 'Kindness'), (Select id from users where email = 'mrkringle@yahoo.com'));
+	((Select id from chimes where title = 'Hogwarts Clean Up'), (Select id from users where email = 'wizardsrcool@gmail.com')),
+	((Select id from chimes where title = 'Reindeer Food Drive'), (Select id from users where email = 'mrkringle@yahoo.com'));
 
 INSERT INTO addresses (latitude, longitude)
 VALUES(29.761993, -95.366302),
