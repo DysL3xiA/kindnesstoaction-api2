@@ -39,7 +39,7 @@ app.get("/", function(req, res){
   res.send("Hello World test");
 });
 
-app.get("/all_chimes", function(req, res){
+app.get("/allChimes", function(req, res){
   //execute the query and the send the results back to the client
   executeQuery(all_chimes, function(context){
     res.send(context);
@@ -68,7 +68,7 @@ app.get("/all_chimes", function(req, res){
  * first_name, last_name, email, latitude, longitude 
 *********************************************************/
 
-app.post("/add_chime", function(req, res){ 
+app.post("/addChime", function(req, res){ 
   addIfNotExist(req.body.coin_num, [req.body.coin_num], 'coin')
   .then((coin_id) => {
     if (coin_id == -1){
@@ -108,6 +108,93 @@ app.post("/add_chime", function(req, res){
     }
   });
 });
+
+/*********************************************************
+ * Add Chime 2 Handle
+ * 
+ * Expects Mandatory Arguments: 
+ * title
+ * coin_num
+ * first_name
+ * last_name
+ * email
+ * latitude
+ * longitude
+ * 
+ * Optional Arguments: 
+ * description
+ * image
+ * 
+ * Returns: chime_id, coin_id, coin_num, title, description,
+ * first_name, last_name, email, latitude, longitude 
+*********************************************************/
+
+// app.post("/addChime2", function(req, res){
+//   async function execute(){
+//     const client = await pool
+//     .connect()
+//     .catch(err => {
+//       console.log("\nclient.connect():", err.name);
+
+//       // iterate over the error object attributes
+//       for (item in err) {
+//         if (err[item] != undefined) {
+//           process.stdout.write(item + " - " + err[item] + " ");
+//         }
+//       }
+
+//       // end the Pool instance
+//       console.log("\n");
+//       process.exit();
+//     });
+
+//     try {
+//       // Initiate the Postgres transaction
+//       await client.query("BEGIN");
+
+//     }  
+
+//   } 
+    
+//   addIfNotExist(req.body.coin_num, [req.body.coin_num], 'coin')
+//   .then((coin_id) => {
+//     if (coin_id == -1){
+//       res.send("Unable to insert coin");
+//     }
+//     else {
+//       // add chime and user
+//       let chime_id = Promise.resolve(
+//         addRelation([coin_id, req.body.title, req.body.description || 'null',
+//         req.body.image || 'null'], 'chime')
+//         );
+//       const user_id = Promise.resolve(
+//         addIfNotExist(req.body.email, [req.body.first_name, 
+//           req.body.last_name, req.body.email, 'FALSE'], 'user')
+//       );
+//       // need to add logic to check if address exists
+//       const address_id = Promise.resolve(
+//         addRelation([req.body.latitude, req.body.longitude], 'address')
+//       );
+//       // once chime and user are added, add chime_user relation
+//       Promise.all([chime_id, user_id, address_id])
+//       .then((values) => {
+//         chime_id = values[0];
+//         const chime_user = addRelation([values[0], values[1]], 'chime_user');
+//         const chime_address = addRelation([values[0], values[2]], 'chime_address'); 
+//         Promise.all([chime_user, chime_address])
+//         .then(() => {
+//           let new_chime = {
+//             text: get_chime,
+//             placeholder_arr: [chime_id],
+//           };
+//           executeParameterQuery(new_chime, function(context){
+//             res.send(context);
+//           });
+//         });
+//       })
+//     }
+//   });
+// });
 
 /*********************************************************
  * Add Ambassador Handle
