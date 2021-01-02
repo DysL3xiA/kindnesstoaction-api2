@@ -210,21 +210,24 @@ app.post("/addChime", function(req, res){
 /************************ Query Execution Functions **************************/
 
 /*********************************************************
-addCoin: 
-Checks if coin already exists. Retrieves id if exists; adds
-new coin and returns new id if not exists
-Receives: coin number to be added
-Returns: id of coin added (or retrieved)
+addIfNotExist: 
+Checks if the entry already exists. If not, adds and returns
+new id. Otherwise, returns id of existing entry.
+Receives: unique_identifier to be looked up, array of params
+for query, "type" identifier to know what table we are checking
+Returns: Id of entry (existing or newly created)
 *********************************************************/
 function addIfNotExist(unique_identifier, paramList, type){
   queryCheckLookup = {
     coin: isCoin,
     user: isUser,
-  }
+  };
+  
   queryInsertLookup = {
     coin: insertCoin,
     user: insertUser,
-  }
+  };
+
   let alreadyExists = {
     text: queryCheckLookup[type], 
     placeholder_arr: [unique_identifier]};
@@ -247,7 +250,7 @@ function addIfNotExist(unique_identifier, paramList, type){
           if (row.rowCount == 1){
             return resolve(row.rows[0].id);
           }
-          // return -1 in event of error inserting coin
+          // return -1 in event of error inserting
           else {
             return reject(-1);
           }
@@ -259,10 +262,10 @@ function addIfNotExist(unique_identifier, paramList, type){
 
 /*********************************************************
 addRelation: 
-Inserts a new chime associated with the coin_id passed
+Inserts a new entry associated with the id passed
 as an argument
-Receives: coin_id, title, description, image
-Returns: 
+Receives: array of params, type of entry to enter
+Returns: Id of new entry
 *********************************************************/
 function addRelation(params, type){
   queryInsertLookup = {
@@ -271,11 +274,13 @@ function addRelation(params, type){
     chime_user: insertChimeUser,
     address: insertAddress,
     chime_address: insertChimeAddress,
-  }
+  };
+
   let queryInsert = {
     text: queryInsertLookup[type],
     placeholder_arr: params
   }; 
+
   return new Promise(function(resolve, reject) {
     executeParameterQuery(queryInsert, function(context){
       if (context.rowCount == 1){
