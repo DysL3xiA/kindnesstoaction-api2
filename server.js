@@ -39,14 +39,30 @@ app.get("/", function(req, res){
   res.send("Hello World test");
 });
 
-app.get("/allChimes", function(req, res){
-  //execute the query and the send the results back to the client
-  executeQuery(all_chimes, function(context){
-    res.send(context);
-  });
-});
-
 /**************************** Handle Descriptions *****************************/
+
+/*********************************************************
+ * All Chimes Handle
+ * 
+ * Returns all chimes currently in the database with all 
+ * data available
+**********************************************************/
+
+app.get("/allChimes", async function(req, res){
+  const client = await pool.connect();
+  await client.query("Select 1");
+  try {
+    //execute the query and the send the results back to the client
+    executeQuery(client, all_chimes, function(context){
+      res.send(context);
+    });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e
+  } finally {
+    await client.release();
+  }
+});
 
 /*********************************************************
  * Add Chime Handle
@@ -68,133 +84,59 @@ app.get("/allChimes", function(req, res){
  * first_name, last_name, email, latitude, longitude 
 *********************************************************/
 
-app.post("/addChime", function(req, res){ 
-  addIfNotExist(req.body.coin_num, [req.body.coin_num], 'coin')
-  .then((coin_id) => {
-    if (coin_id == -1){
-      res.send("Unable to insert coin");
-    }
-    else {
-      // add chime and user
-      let chime_id = Promise.resolve(
-        addRelation([coin_id, req.body.title, req.body.description || 'null',
-        req.body.image || 'null'], 'chime')
-        );
-      const user_id = Promise.resolve(
-        addIfNotExist(req.body.email, [req.body.first_name, 
-          req.body.last_name, req.body.email, 'FALSE'], 'user')
-      );
-      // need to add logic to check if address exists
-      const address_id = Promise.resolve(
-        addRelation([req.body.latitude, req.body.longitude], 'address')
-      );
-      // once chime and user are added, add chime_user relation
-      Promise.all([chime_id, user_id, address_id])
-      .then((values) => {
-        chime_id = values[0];
-        const chime_user = addRelation([values[0], values[1]], 'chime_user');
-        const chime_address = addRelation([values[0], values[2]], 'chime_address'); 
-        Promise.all([chime_user, chime_address])
-        .then(() => {
-          let new_chime = {
-            text: get_chime,
-            placeholder_arr: [chime_id],
-          };
-          executeParameterQuery(new_chime, function(context){
-            res.send(context);
-          });
-        });
-      })
-    }
-  });
+app.post("/addChime", async function(req, res){ 
+  const client = await pool.connect()
+  .catch(err => console.error('Error executing query', err.stack))
+  try {
+    client.query('BEGIN')
+    .then(() => {
+      addIfNotExist(client, req.body.coin_num, [req.body.coin_num], 'coin')
+      .then((coin_id) => {
+        if (coin_id == -1){
+          res.send("Unable to insert coin");
+        }
+        else {
+          // add chime and user
+          let chime_id = Promise.resolve(
+            addRelation(client, [coin_id, req.body.title, req.body.description || 'null',
+            req.body.image || 'null'], 'chime')
+            );
+          const user_id = Promise.resolve(
+            addIfNotExist(client, req.body.email, [req.body.first_name, 
+              req.body.last_name, req.body.email, 'FALSE'], 'user')
+          );
+          // need to add logic to check if address exists
+          const address_id = Promise.resolve(
+            addRelation(client, [req.body.latitude, req.body.longitude], 'address')
+          );
+          // once chime and user are added, add chime_user relation
+          Promise.all([chime_id, user_id, address_id])
+          .then((values) => {
+            chime_id = values[0];
+            const chime_user = addRelation(client, [values[0], values[1]], 'chime_user');
+            const chime_address = addRelation(client, [values[0], values[2]], 'chime_address'); 
+            Promise.all([chime_user, chime_address])
+            .then(() => {
+              let new_chime = {
+                text: get_chime,
+                placeholder_arr: [chime_id],
+              };
+              executeParameterQuery(client, new_chime, function(context){
+                client.query('COMMIT');
+                res.send(context);
+              });
+            });
+          })
+        }
+      });
+    })
+  } catch (e) {
+    await client.query('ROLLBACK')
+    throw e
+  } finally {
+    client.release()
+  }
 });
-
-/*********************************************************
- * Add Chime 2 Handle
- * 
- * Expects Mandatory Arguments: 
- * title
- * coin_num
- * first_name
- * last_name
- * email
- * latitude
- * longitude
- * 
- * Optional Arguments: 
- * description
- * image
- * 
- * Returns: chime_id, coin_id, coin_num, title, description,
- * first_name, last_name, email, latitude, longitude 
-*********************************************************/
-
-// app.post("/addChime2", function(req, res){
-//   async function execute(){
-//     const client = await pool
-//     .connect()
-//     .catch(err => {
-//       console.log("\nclient.connect():", err.name);
-
-//       // iterate over the error object attributes
-//       for (item in err) {
-//         if (err[item] != undefined) {
-//           process.stdout.write(item + " - " + err[item] + " ");
-//         }
-//       }
-
-//       // end the Pool instance
-//       console.log("\n");
-//       process.exit();
-//     });
-
-//     try {
-//       // Initiate the Postgres transaction
-//       await client.query("BEGIN");
-
-//     }  
-
-//   } 
-    
-//   addIfNotExist(req.body.coin_num, [req.body.coin_num], 'coin')
-//   .then((coin_id) => {
-//     if (coin_id == -1){
-//       res.send("Unable to insert coin");
-//     }
-//     else {
-//       // add chime and user
-//       let chime_id = Promise.resolve(
-//         addRelation([coin_id, req.body.title, req.body.description || 'null',
-//         req.body.image || 'null'], 'chime')
-//         );
-//       const user_id = Promise.resolve(
-//         addIfNotExist(req.body.email, [req.body.first_name, 
-//           req.body.last_name, req.body.email, 'FALSE'], 'user')
-//       );
-//       // need to add logic to check if address exists
-//       const address_id = Promise.resolve(
-//         addRelation([req.body.latitude, req.body.longitude], 'address')
-//       );
-//       // once chime and user are added, add chime_user relation
-//       Promise.all([chime_id, user_id, address_id])
-//       .then((values) => {
-//         chime_id = values[0];
-//         const chime_user = addRelation([values[0], values[1]], 'chime_user');
-//         const chime_address = addRelation([values[0], values[2]], 'chime_address'); 
-//         Promise.all([chime_user, chime_address])
-//         .then(() => {
-//           let new_chime = {
-//             text: get_chime,
-//             placeholder_arr: [chime_id],
-//           };
-//           executeParameterQuery(new_chime, function(context){
-//             res.send(context);
-//           });
-//         });
-//       })
-//     }
-//   });
-// });
 
 /*********************************************************
  * Add Ambassador Handle
@@ -217,12 +159,12 @@ Receives: unique_identifier to be looked up, array of params
 for query, "type" identifier to know what table we are checking
 Returns: Id of entry (existing or newly created)
 *********************************************************/
-function addIfNotExist(unique_identifier, paramList, type){
+function addIfNotExist(client, unique_identifier, paramList, type){
   queryCheckLookup = {
     coin: isCoin,
     user: isUser,
   };
-  
+
   queryInsertLookup = {
     coin: insertCoin,
     user: insertUser,
@@ -233,7 +175,7 @@ function addIfNotExist(unique_identifier, paramList, type){
     placeholder_arr: [unique_identifier]};
 
   return new Promise(function(resolve, reject) {
-    parameterQuery(alreadyExists)
+    parameterQuery(client, alreadyExists)
     .then((row) => {
       // if the new value already exists, then return id
       if (row.rowCount == 1){
@@ -245,7 +187,7 @@ function addIfNotExist(unique_identifier, paramList, type){
           text: queryInsertLookup[type],
           placeholder_arr: paramList
         }
-        parameterQuery(queryInsert)
+        parameterQuery(client, queryInsert)
         .then((row) => {
           if (row.rowCount == 1){
             return resolve(row.rows[0].id);
@@ -267,7 +209,7 @@ as an argument
 Receives: array of params, type of entry to enter
 Returns: Id of new entry
 *********************************************************/
-function addRelation(params, type){
+function addRelation(client, params, type){
   queryInsertLookup = {
     chime: insertChime,
     user: insertUser,
@@ -282,7 +224,7 @@ function addRelation(params, type){
   }; 
 
   return new Promise(function(resolve, reject) {
-    executeParameterQuery(queryInsert, function(context){
+    executeParameterQuery(client, queryInsert, function(context){
       if (context.rowCount == 1){
         return resolve(context.rows[0].id);
       }
@@ -302,8 +244,8 @@ the client
 Receives: query - query string; callback - callback function
 Returns: nothing (sends back rows to callback function)
 *********************************************************/
-function executeQuery(query, callback){
-  pool.query(query, function(err, rows){
+function executeQuery(client, query, callback){
+  client.query(query, function(err, rows){
       if(err){
         return console.error('Error executing query', err.stack)
       }
@@ -317,10 +259,10 @@ Executes a query that has parameters
 Receives: JSON object with text and placeholder_arr values
 Returns: rows (from query execution)
 *********************************************************/
-function parameterQuery(query) {
+function parameterQuery(client, query) {
   return new Promise(function(resolve, reject) {
       try {
-          pool.query(query.text, query.placeholder_arr, function(err, rows, fields) {
+          client.query(query.text, query.placeholder_arr, function(err, rows, fields) {
               if (err) {
                   return reject(err);
               } else {
@@ -341,8 +283,8 @@ the client
 Receives: JSON object with text + placeholder_arr values, callback
 Returns: nothing (sends back rows to callback function)
 *********************************************************/
-function executeParameterQuery(query, callback) {
-  pool.query(query.text, query.placeholder_arr, function(err, rows) {
+function executeParameterQuery(client, query, callback) {
+  client.query(query.text, query.placeholder_arr, function(err, rows) {
     if (err) {
       return console.error('Error executing query', err.stack)
     }

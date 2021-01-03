@@ -107,7 +107,7 @@ VALUES((Select id from chimes where title = 'Test Chime'), (Select id from users
 INSERT INTO addresses (latitude, longitude)
 VALUES(29.761993, -95.366302),
 	(51.5361, -0.1251),
-	(90.0000, 0.0000);
+	(90.0000, -135.0000);
 
 INSERT INTO chime_address (address_id, chime_id)
 VALUES(1, 1),
