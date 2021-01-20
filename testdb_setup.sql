@@ -44,10 +44,15 @@ CREATE TABLE chime_user (
 	created_at TIMESTAMP DEFAULT NOW() NOT NULL,
 	updated_at TIMESTAMP DEFAULT NOW() NOT NULL,
 	chime_id INT,
-	user_id INT,
+	giver_user_id INT,
+	receiver_user_id INT,
 	PRIMARY KEY(id),
-	CONSTRAINT fk_user
-      FOREIGN KEY(user_id) 
+	CONSTRAINT fk_user_giver
+      FOREIGN KEY(giver_user_id) 
+	  REFERENCES users(id)
+	  ON DELETE CASCADE,
+	CONSTRAINT fk_user_receiver
+      FOREIGN KEY(receiver_user_id) 
 	  REFERENCES users(id)
 	  ON DELETE CASCADE,
 	CONSTRAINT fk_chime
@@ -101,12 +106,12 @@ Values('Test Chime', 1, null),
 	('Reindeer Food Drive', 2, 'Elves did a food drive for local reindeer in need'),
 	('It all starts here.', 3, 'Elijah James Knight infuses the world with light and joy. 3 weeks before his tragic death, he made this profound statement: "Start everything with kindness and the end will be okay." Through his example, Elijah inspires us to turn kindness to action according to our unique talents and interests to remake the world as it should be. If you have received a Kindness Coin, thank you for doing the work of kindness. Now, recognize and encourage others to go do! https://www.dignitymemorial.com/obituaries/houston-tx/elijah-knight-7898454');
 
-INSERT INTO chime_user (chime_id, user_id)
-VALUES((Select id from chimes where title = 'Test Chime'), (Select id from users where email = 'lexichasney@gmail.com')),
-	((Select id from chimes where title = 'Kindness'), (Select id from users where email = 'wyicked@gmail.com')),
-	((Select id from chimes where title = 'Hogwarts Clean Up'), (Select id from users where email = 'wizardsrcool@gmail.com')),
-	((Select id from chimes where title = 'Reindeer Food Drive'), (Select id from users where email = 'mrkringle@yahoo.com')),
-	((Select id from chimes where title = 'It all starts here.'), (Select id from users where email = 'e.knight@gmail.com'));
+INSERT INTO chime_user (chime_id, giver_user_id, receiver_user_id)
+VALUES((Select id from chimes where title = 'Test Chime'), (Select id from users where email = 'lexichasney@gmail.com'), (Select id from users where email = 'wyicked@gmail.com')),
+	((Select id from chimes where title = 'Kindness'), (Select id from users where email = 'wyicked@gmail.com'), null),
+	((Select id from chimes where title = 'Hogwarts Clean Up'), (Select id from users where email = 'wizardsrcool@gmail.com'), null),
+	((Select id from chimes where title = 'Reindeer Food Drive'), (Select id from users where email = 'mrkringle@yahoo.com'), (Select id from users where email = 'wizardsrcool@gmail.com')),
+	((Select id from chimes where title = 'It all starts here.'), (Select id from users where email = 'e.knight@gmail.com'), null);
 
 INSERT INTO addresses (latitude, longitude)
 VALUES(29.761993, -95.366302),
