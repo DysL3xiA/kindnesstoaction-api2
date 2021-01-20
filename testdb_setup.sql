@@ -84,33 +84,39 @@ CREATE TABLE chime_address (
 
 INSERT INTO coins (coin_num)
 VALUES('12345abc'),
-	('abcd123');
+	('abcd123'),
+	('012104');
 
 INSERT INTO users (first_name, last_name, email)
 VALUES('Alexis', 'Schindel', 'lexichasney@gmail.com'),
 	('Tyler', 'Schindel', 'wyicked@gmail.com'),
 	('Harry', 'Potter', 'wizardsrcool@gmail.com'),
-	('Santa', 'Clause', 'mrkringle@yahoo.com');
+	('Santa', 'Clause', 'mrkringle@yahoo.com'),
+	('Elijah', 'Knight', 'e.knight@gmail.com');
 
 INSERT INTO chimes (title, coin_id, description)
 Values('Test Chime', 1, null),
 	('Kindness', 2, null),
 	('Hogwarts Clean Up', 2, 'Cleaned up the Hogwarts campus'),
-	('Reindeer Food Drive', 2, 'Elves did a food drive for local reindeer in need');
+	('Reindeer Food Drive', 2, 'Elves did a food drive for local reindeer in need'),
+	('It all starts here.', 3, 'Elijah James Knight infuses the world with light and joy. 3 weeks before his tragic death, he made this profound statement: "Start everything with kindness and the end will be okay." Through his example, Elijah inspires us to turn kindness to action according to our unique talents and interests to remake the world as it should be. If you have received a Kindness Coin, thank you for doing the work of kindness. Now, recognize and encourage others to go do! https://www.dignitymemorial.com/obituaries/houston-tx/elijah-knight-7898454');
 
 INSERT INTO chime_user (chime_id, user_id)
 VALUES((Select id from chimes where title = 'Test Chime'), (Select id from users where email = 'lexichasney@gmail.com')),
 	((Select id from chimes where title = 'Kindness'), (Select id from users where email = 'wyicked@gmail.com')),
 	((Select id from chimes where title = 'Hogwarts Clean Up'), (Select id from users where email = 'wizardsrcool@gmail.com')),
-	((Select id from chimes where title = 'Reindeer Food Drive'), (Select id from users where email = 'mrkringle@yahoo.com'));
+	((Select id from chimes where title = 'Reindeer Food Drive'), (Select id from users where email = 'mrkringle@yahoo.com')),
+	((Select id from chimes where title = 'It all starts here.'), (Select id from users where email = 'e.knight@gmail.com'));
 
 INSERT INTO addresses (latitude, longitude)
 VALUES(29.761993, -95.366302),
 	(51.5361, -0.1251),
-	(90.0000, -135.0000);
+	(90.0000, -135.0000),
+	(29.9717, -95.6938);
 
 INSERT INTO chime_address (address_id, chime_id)
 VALUES(1, 1),
 	(1, 2),
 	(2, 3),
-	(3, 4);
+	(3, 4),
+	(4, 5);

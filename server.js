@@ -2,7 +2,7 @@
 const http = require("http");
 const cors = require('cors')
 const hostname = 'localhost';
-const port = 3000;
+const port = 3500;
 
 const express = require('express');
 const app = express();
@@ -50,7 +50,6 @@ app.get("/", function(req, res){
 
 app.get("/allChimes", async function(req, res){
   const client = await pool.connect();
-  await client.query("Select 1");
   try {
     //execute the query and the send the results back to the client
     executeQuery(client, all_chimes, function(context){
@@ -58,9 +57,41 @@ app.get("/allChimes", async function(req, res){
     });
   } catch (e) {
     await client.query('ROLLBACK');
-    throw e
+    throw (e);
   } finally {
     await client.release();
+  }
+});
+
+/*********************************************************
+ * Get single chime based on chime_id
+ * 
+ * Returns single chime's data
+**********************************************************/
+
+app.get("/getCoin", async function(req, res){
+  const client = await pool.connect();
+  if (req.query.id){
+    try {
+      let getCoin = {
+        text: get_coin,
+        placeholder_arr: [req.query.id],
+      };
+      //execute the query and the send the results back to the client
+      executeParameterQuery(client, getCoin, function(context){
+        if (context.rowCount >= 1){
+          res.send(context.rows);
+        }
+        else {
+          res.send("No coin found");
+        }
+      });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw (e);
+    } finally {
+      await client.release();
+    }
   }
 });
 
@@ -102,8 +133,8 @@ app.post("/addChime", async function(req, res){
             req.body.image || 'null'], 'chime')
             );
           const user_id = Promise.resolve(
-            addIfNotExist(client, req.body.email, [req.body.first_name, 
-              req.body.last_name, req.body.email, 'FALSE'], 'user')
+            addIfNotExist(client, req.body.email || null, [req.body.first_name, 
+              req.body.last_name, req.body.email || null, 'FALSE'], 'user')
           );
           // need to add logic to check if address exists
           const address_id = Promise.resolve(
@@ -124,6 +155,7 @@ app.post("/addChime", async function(req, res){
               executeParameterQuery(client, new_chime, function(context){
                 client.query('COMMIT');
                 res.send(context);
+                client.release();
               });
             });
           })
@@ -131,10 +163,10 @@ app.post("/addChime", async function(req, res){
       });
     })
   } catch (e) {
-    await client.query('ROLLBACK')
-    throw e
-  } finally {
-    client.release()
+    console.log("blarb");
+    await client.query('ROLLBACK');
+    await client.release(e);
+    throw e;
   }
 });
 
@@ -345,6 +377,32 @@ left join chime_user cu on cu.chime_id = ch.id
 left join users u on u.id = cu.user_id
 
 where ch.id = ($1);`;
+
+/*************************************************
+ * Get single coin
+*************************************************/
+let get_coin = 
+`select 
+ch.id as chime_id,
+cc.id as coin_id,
+cc.coin_num,
+ch.title,
+ch.description,
+ch.image,
+u.first_name,
+u.last_name,
+u.email,
+aa.latitude,
+aa.longitude
+
+from coins cc 
+left join chimes ch on ch.coin_id = cc.id
+left join chime_address ca on ca.chime_id = ch.id
+left join addresses aa on aa.id = ca.address_id
+left join chime_user cu on cu.chime_id = ch.id
+left join users u on u.id = cu.user_id
+
+where cc.coin_num = ($1);`;
 
 /*************************************************
  * Insert new coin
