@@ -339,9 +339,12 @@ cc.coin_num,
 ch.title,
 ch.description,
 ch.image,
-u.first_name,
-u.last_name,
-u.email,
+u.first_name as first_name_giver,
+u.last_name as last_name_giver,
+u.email as email_giver,
+u2.first_name as first_name_receiver,
+u2.last_name as last_name_receiver,
+u2.email as email_receiver,
 aa.latitude,
 aa.longitude
 
@@ -350,7 +353,8 @@ left join coins cc on ch.coin_id = cc.id
 left join chime_address ca on ca.chime_id = ch.id
 left join addresses aa on aa.id = ca.address_id
 left join chime_user cu on cu.chime_id = ch.id
-left join users u on u.id = cu.user_id`;
+left join users u on u.id = cu.user_id_giver
+left join users u2 on u2.id = cu.user_id_receiver`;
 
 /*************************************************
  * Get single chime
@@ -363,9 +367,12 @@ cc.coin_num,
 ch.title,
 ch.description,
 ch.image,
-u.first_name,
-u.last_name,
-u.email,
+u.first_name as first_name_giver,
+u.last_name as last_name_giver,
+u.email as email_giver,
+u2.first_name as first_name_receiver,
+u2.last_name as last_name_receiver,
+u2.email as email_receiver,
 aa.latitude,
 aa.longitude
 
@@ -374,7 +381,8 @@ left join coins cc on ch.coin_id = cc.id
 left join chime_address ca on ca.chime_id = ch.id
 left join addresses aa on aa.id = ca.address_id
 left join chime_user cu on cu.chime_id = ch.id
-left join users u on u.id = cu.user_id
+left join users u on u.id = cu.user_id_giver
+left join users u2 on u2.id = cu.user_id_receiver
 
 where ch.id = ($1);`;
 
@@ -389,9 +397,12 @@ cc.coin_num,
 ch.title,
 ch.description,
 ch.image,
-u.first_name,
-u.last_name,
-u.email,
+u.first_name as first_name_giver,
+u.last_name as last_name_giver,
+u.email as email_giver,
+u2.first_name as first_name_receiver,
+u2.last_name as last_name_receiver,
+u2.email as email_receiver,
 aa.latitude,
 aa.longitude
 
@@ -400,7 +411,8 @@ left join chimes ch on ch.coin_id = cc.id
 left join chime_address ca on ca.chime_id = ch.id
 left join addresses aa on aa.id = ca.address_id
 left join chime_user cu on cu.chime_id = ch.id
-left join users u on u.id = cu.user_id
+left join users u on u.id = cu.user_id_giver
+left join users u2 on u2.id = cu.user_id_receiver
 
 where cc.coin_num = ($1);`;
 
