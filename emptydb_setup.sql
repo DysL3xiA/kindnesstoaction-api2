@@ -1,6 +1,7 @@
 DROP TABLE IF EXISTS chime_user;
 DROP TABLE IF EXISTS chime_address;
 DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS user_type;
 DROP TABLE IF EXISTS chimes;
 DROP TABLE IF EXISTS addresses;
 DROP TABLE IF EXISTS coins;
@@ -17,8 +18,7 @@ CREATE TABLE users (
 	id INT GENERATED ALWAYS AS IDENTITY,
 	created_at TIMESTAMP DEFAULT NOW() NOT NULL,
 	updated_at TIMESTAMP DEFAULT NOW() NOT NULL,
-	first_name VARCHAR NOT NULL,
-	last_name VARCHAR NOT NULL,
+	user_name VARCHAR NOT NULL,
 	email VARCHAR NOT NULL,
 	is_ambassador BOOLEAN NOT NULL DEFAULT FALSE,
 	PRIMARY KEY(id)
@@ -39,17 +39,27 @@ CREATE TABLE chimes (
 	  ON DELETE CASCADE
 );
 
+CREATE TABLE user_type (
+	id INT GENERATED ALWAYS AS IDENTITY,
+	name VARCHAR NOT NULL,
+	PRIMARY KEY(id)
+);
+
 CREATE TABLE chime_user (
 	id INT GENERATED ALWAYS AS IDENTITY,
 	created_at TIMESTAMP DEFAULT NOW() NOT NULL,
 	updated_at TIMESTAMP DEFAULT NOW() NOT NULL,
 	chime_id INT,
 	user_id INT,
+	user_type INT,
 	PRIMARY KEY(id),
 	CONSTRAINT fk_user
       FOREIGN KEY(user_id) 
 	  REFERENCES users(id)
 	  ON DELETE CASCADE,
+	CONSTRAINT fk_user_type
+      FOREIGN KEY(user_type) 
+	  REFERENCES user_type(id),
 	CONSTRAINT fk_chime
       FOREIGN KEY(chime_id) 
 	  REFERENCES chimes(id)

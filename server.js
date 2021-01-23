@@ -1,6 +1,6 @@
 //Load HTTP module
 const http = require("http");
-const cors = require('cors')
+const cors = require('cors');
 const hostname = 'localhost';
 const port = 3500;
 
@@ -51,15 +51,17 @@ app.get("/", function(req, res){
 app.get("/allChimes", async function(req, res){
   const client = await pool.connect();
   try {
+    await client.query('BEGIN');
     //execute the query and the send the results back to the client
     executeQuery(client, all_chimes, function(context){
       res.send(context);
     });
+    await client.query('COMMIT')
   } catch (e) {
     await client.query('ROLLBACK');
     throw (e);
   } finally {
-    await client.release();
+    client.release();
   }
 });
 
@@ -276,7 +278,7 @@ the client
 Receives: query - query string; callback - callback function
 Returns: nothing (sends back rows to callback function)
 *********************************************************/
-function executeQuery(client, query, callback){
+async function executeQuery(client, query, callback){
   client.query(query, function(err, rows){
       if(err){
         return console.error('Error executing query', err.stack)
@@ -332,47 +334,62 @@ function executeParameterQuery(client, query, callback) {
  * Returns all chimes
 *************************************************/
 let all_chimes = 
-`select 
-ch.id as chime_id,
-cc.id as coin_id,
-cc.coin_num,
-ch.title,
-ch.description,
-ch.image,
-u.first_name as first_name_giver,
-u.last_name as last_name_giver,
-u.email as email_giver,
-u2.first_name as first_name_receiver,
-u2.last_name as last_name_receiver,
-u2.email as email_receiver,
-aa.latitude,
-aa.longitude
-
-from chimes ch
-left join coins cc on ch.coin_id = cc.id
-left join chime_address ca on ca.chime_id = ch.id
-left join addresses aa on aa.id = ca.address_id
-left join chime_user cu on cu.chime_id = ch.id
-left join users u on u.id = cu.user_id_giver
-left join users u2 on u2.id = cu.user_id_receiver`;
+`WITH chime_users as (
+  select
+  cu.*,
+  ut.name as user_type_name,
+  u.user_name,
+  u.email
+  
+  from chime_user cu
+  left join user_type ut on ut.id = cu.user_type
+  left join users u on u.id = cu.user_id
+  )
+  
+  select distinct 
+  ch.id as chime_id,
+  cc.id as coin_id,
+  cc.coin_num,
+  ch.title,
+  ch.description,
+  ch.image,
+  cu.user_name as giver,
+  cu2.user_name as receiver,
+  aa.latitude,
+  aa.longitude
+  
+  from chimes ch
+  left join coins cc on ch.coin_id = cc.id
+  left join chime_address ca on ca.chime_id = ch.id
+  left join addresses aa on aa.id = ca.address_id
+  left join chime_users cu on cu.chime_id = ch.id and cu.user_type_name = 'Receiver'
+  left join chime_users cu2 on cu2.chime_id = ch.id and cu2.user_type_name = 'Giver'`;
 
 /*************************************************
  * Get single chime
 *************************************************/
 let get_chime = 
-`select 
+`WITH chime_users as (
+  select
+  cu.*,
+  ut.name as user_type_name,
+  u.user_name,
+  u.email
+  
+  from chime_user cu
+  left join user_type ut on ut.id = cu.user_type
+  left join users u on u.id = cu.user_id
+  )
+  
+select distinct
 ch.id as chime_id,
 cc.id as coin_id,
 cc.coin_num,
 ch.title,
 ch.description,
 ch.image,
-u.first_name as first_name_giver,
-u.last_name as last_name_giver,
-u.email as email_giver,
-u2.first_name as first_name_receiver,
-u2.last_name as last_name_receiver,
-u2.email as email_receiver,
+cu.user_name as giver,
+cu2.user_name as receiver,
 aa.latitude,
 aa.longitude
 
@@ -380,9 +397,8 @@ from chimes ch
 left join coins cc on ch.coin_id = cc.id
 left join chime_address ca on ca.chime_id = ch.id
 left join addresses aa on aa.id = ca.address_id
-left join chime_user cu on cu.chime_id = ch.id
-left join users u on u.id = cu.user_id_giver
-left join users u2 on u2.id = cu.user_id_receiver
+left join chime_users cu on cu.chime_id = ch.id and cu.user_type_name = 'Receiver'
+left join chime_users cu2 on cu2.chime_id = ch.id and cu2.user_type_name = 'Giver'
 
 where ch.id = ($1);`;
 
@@ -390,19 +406,27 @@ where ch.id = ($1);`;
  * Get single coin
 *************************************************/
 let get_coin = 
-`select 
+`WITH chime_users as (
+  select
+  cu.*,
+  ut.name as user_type_name,
+  u.user_name,
+  u.email
+  
+  from chime_user cu
+  left join user_type ut on ut.id = cu.user_type
+  left join users u on u.id = cu.user_id
+  )
+
+select distinct
 ch.id as chime_id,
 cc.id as coin_id,
 cc.coin_num,
 ch.title,
 ch.description,
 ch.image,
-u.first_name as first_name_giver,
-u.last_name as last_name_giver,
-u.email as email_giver,
-u2.first_name as first_name_receiver,
-u2.last_name as last_name_receiver,
-u2.email as email_receiver,
+cu.user_name as giver,
+cu2.user_name as receiver,
 aa.latitude,
 aa.longitude
 
@@ -410,9 +434,8 @@ from coins cc
 left join chimes ch on ch.coin_id = cc.id
 left join chime_address ca on ca.chime_id = ch.id
 left join addresses aa on aa.id = ca.address_id
-left join chime_user cu on cu.chime_id = ch.id
-left join users u on u.id = cu.user_id_giver
-left join users u2 on u2.id = cu.user_id_receiver
+left join chime_users cu on cu.chime_id = ch.id and cu.user_type_name = 'Receiver'
+left join chime_users cu2 on cu2.chime_id = ch.id and cu2.user_type_name = 'Giver'
 
 where cc.coin_num = ($1);`;
 
@@ -436,7 +459,7 @@ RETURNING id;`;
  * Insert new user
 *************************************************/
 let insertUser = 
-`INSERT INTO users (first_name, last_name, email, is_ambassador)
+`INSERT INTO users (name, email, is_ambassador)
 VALUES ($1, $2, $3, $4)
 RETURNING id;`;
 

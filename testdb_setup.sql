@@ -18,8 +18,7 @@ CREATE TABLE users (
 	id INT GENERATED ALWAYS AS IDENTITY,
 	created_at TIMESTAMP DEFAULT NOW() NOT NULL,
 	updated_at TIMESTAMP DEFAULT NOW() NOT NULL,
-	first_name VARCHAR NOT NULL,
-	last_name VARCHAR NOT NULL,
+	user_name VARCHAR NOT NULL,
 	email VARCHAR NOT NULL,
 	is_ambassador BOOLEAN NOT NULL DEFAULT FALSE,
 	PRIMARY KEY(id)
@@ -102,12 +101,12 @@ INSERT INTO user_type (name)
 VALUES('Giver'),
 	('Receiver');
 
-INSERT INTO users (first_name, last_name, email)
-VALUES('Alexis', 'Schindel', 'lexichasney@gmail.com'),
-	('Tyler', 'Schindel', 'wyicked@gmail.com'),
-	('Harry', 'Potter', 'wizardsrcool@gmail.com'),
-	('Santa', 'Clause', 'mrkringle@yahoo.com'),
-	('Elijah', 'Knight', 'e.knight@gmail.com');
+INSERT INTO users (user_name, email)
+VALUES('Alexis Schindel', 'lexichasney@gmail.com'),
+	('Tyler Schindel', 'wyicked@gmail.com'),
+	('Harry Potter', 'wizardsrcool@gmail.com'),
+	('Santa Clause', 'mrkringle@yahoo.com'),
+	('Elijah Knight', 'e.knight@gmail.com');
 
 INSERT INTO chimes (title, coin_id, description)
 Values('Test Chime', 1, null),
