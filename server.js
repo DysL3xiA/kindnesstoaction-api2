@@ -50,25 +50,22 @@ app.get("/", function(req, res){
 
 app.get("/allChimes", async function(req, res){
   const client = await pool.connect();
+  let context;
   try {
-    await client.query('BEGIN');
     //execute the query and the send the results back to the client
-    executeQuery(client, all_chimes, function(context){
-      res.send(context);
-    });
-    await client.query('COMMIT')
+    context = await executeQuery(client, all_chimes);
   } catch (e) {
-    await client.query('ROLLBACK');
     throw (e);
   } finally {
     client.release();
   }
+  res.send(context);
 });
 
 /*********************************************************
- * Get single chime based on chime_id
+ * Get single coin based on coin_num
  * 
- * Returns single chime's data
+ * Returns single coin's data
 **********************************************************/
 
 app.get("/getCoin", async function(req, res){
@@ -89,13 +86,45 @@ app.get("/getCoin", async function(req, res){
         }
       });
     } catch (e) {
-      await client.query('ROLLBACK');
       throw (e);
     } finally {
       await client.release();
     }
   }
 });
+
+/*********************************************************
+ * All Chimes Handle
+ * 
+ * Returns all chimes currently in the database with all 
+ * data available
+**********************************************************/
+
+app.get("/getSelectChimes", async function(req, res){
+  const client = await pool.connect();
+  if (req.query.id){
+    try {
+      let getSelectChimes = {
+        text: get_select_chimes,
+        placeholder_arr: [req.query.id],
+      };
+      //execute the query and the send the results back to the client
+      executeParameterQuery(client, getSelectChimes, function(context){
+        if (context.rowCount >= 1){
+          res.send(context.rows);
+        }
+        else {
+          res.send("No coin found");
+        }
+      });
+    } catch (e) {
+      throw (e);
+    } finally {
+      await client.release();
+    }
+  }
+});
+
 
 /*********************************************************
  * Add Chime Handle
@@ -278,14 +307,15 @@ the client
 Receives: query - query string; callback - callback function
 Returns: nothing (sends back rows to callback function)
 *********************************************************/
-async function executeQuery(client, query, callback){
-  client.query(query, function(err, rows){
-      if(err){
-        return console.error('Error executing query', err.stack)
-      }
-      callback(JSON.stringify(rows.rows));
-  });
-};
+async function executeQuery(client, query) {
+  let response;
+  try {
+    response = await client.query(query);
+  } catch (error) {
+    console.log("ERROR: ", error);
+  }
+  return response.rows;
+}
 
 /*********************************************************
 parameterQuery:  
@@ -333,7 +363,7 @@ function executeParameterQuery(client, query, callback) {
 /*************************************************
  * Returns all chimes
 *************************************************/
-let all_chimes = 
+const all_chimes = 
 `WITH chime_users as (
   select
   cu.*,
@@ -368,7 +398,7 @@ let all_chimes =
 /*************************************************
  * Get single chime
 *************************************************/
-let get_chime = 
+const get_chime = 
 `WITH chime_users as (
   select
   cu.*,
@@ -403,15 +433,49 @@ left join chime_users cu2 on cu2.chime_id = ch.id and cu2.user_type_name = 'Give
 where ch.id = ($1);`;
 
 /*************************************************
- * Get single coin
+ * Get coins based on coin_num or title
 *************************************************/
-let get_coin = 
-`WITH chime_users as (
+const get_select_chimes = `WITH chime_users as (
   select
   cu.*,
   ut.name as user_type_name,
   u.user_name,
   u.email
+  
+  from chime_user cu
+  left join user_type ut on ut.id = cu.user_type
+  left join users u on u.id = cu.user_id
+  )
+  
+  select distinct 
+  ch.id as chime_id,
+  cc.id as coin_id,
+  cc.coin_num,
+  ch.title,
+  ch.description,
+  ch.image,
+  cu.user_name as giver,
+  cu2.user_name as receiver,
+  aa.latitude,
+  aa.longitude
+  
+  from chimes ch
+  left join coins cc on ch.coin_id = cc.id
+  left join chime_address ca on ca.chime_id = ch.id
+  left join addresses aa on aa.id = ca.address_id
+  left join chime_users cu on cu.chime_id = ch.id and cu.user_type_name = 'Receiver'
+  left join chime_users cu2 on cu2.chime_id = ch.id and cu2.user_type_name = 'Giver'
+  where cc.coin_num = ($1) OR ch.title = ($1);`;
+
+/*************************************************
+ * Get single coin
+*************************************************/
+const get_coin = 
+`WITH chime_users as (
+  select
+  cu.*,
+  ut.name as user_type_name,
+  u.user_name
   
   from chime_user cu
   left join user_type ut on ut.id = cu.user_type
@@ -442,7 +506,7 @@ where cc.coin_num = ($1);`;
 /*************************************************
  * Insert new coin
 *************************************************/
-let insertCoin = 
+const insertCoin = 
 `INSERT INTO coins (coin_num)
 VALUES ($1)
 RETURNING id;`;
@@ -450,7 +514,7 @@ RETURNING id;`;
 /*************************************************
  * Insert new chime
 *************************************************/
-let insertChime = 
+const insertChime = 
 `INSERT INTO chimes (coin_id, title, description, image)
 VALUES ($1, $2, $3, $4)
 RETURNING id;`;
@@ -458,7 +522,7 @@ RETURNING id;`;
 /*************************************************
  * Insert new user
 *************************************************/
-let insertUser = 
+const insertUser = 
 `INSERT INTO users (name, email, is_ambassador)
 VALUES ($1, $2, $3, $4)
 RETURNING id;`;
@@ -466,7 +530,7 @@ RETURNING id;`;
 /*************************************************
  * Insert new address
 *************************************************/
-let insertAddress = 
+const insertAddress = 
 `INSERT INTO addresses (latitude, longitude)
 VALUES ($1, $2)
 RETURNING id;`;
@@ -474,7 +538,7 @@ RETURNING id;`;
 /*************************************************
  * Insert new chime_address
 *************************************************/
-let insertChimeAddress = 
+const insertChimeAddress = 
 `INSERT INTO chime_address (chime_id, address_id)
 VALUES ($1, $2)
 RETURNING id;`;
@@ -482,7 +546,7 @@ RETURNING id;`;
 /*************************************************
  * Insert new chime_user
 *************************************************/
-let insertChimeUser = 
+const insertChimeUser = 
 `INSERT INTO chime_user (chime_id, user_id)
 VALUES ($1, $2)
 RETURNING id;`;
@@ -490,23 +554,23 @@ RETURNING id;`;
 /*************************************************
  * Find if user exists
 *************************************************/
-let isUser = 
+const isUser = 
 `Select id FROM users where lower(email) = lower($1);`;
 
 /*************************************************
  * Find if address exists
 *************************************************/
-let isAddress = 
+const isAddress = 
 `Select id FROM addresses where latitude = $1 and longitude = $2;`;
 
 /*************************************************
  * Find if chime exists
 *************************************************/
-let isChime = 
+const isChime = 
 `Select id FROM chimes where title = $1;`;
 
 /*************************************************
  * Find if coin exists
 *************************************************/
-let isCoin = 
+const isCoin = 
 `Select id FROM coins where coin_num = $1;`;
