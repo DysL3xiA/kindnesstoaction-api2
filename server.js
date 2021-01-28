@@ -82,7 +82,7 @@ app.get("/getCoin", async function(req, res){
           res.send(context.rows);
         }
         else {
-          res.send("No coin found");
+          res.send("Error: No coin found");
         }
       });
     } catch (e) {
@@ -90,6 +90,9 @@ app.get("/getCoin", async function(req, res){
     } finally {
       await client.release();
     }
+  }
+  else {
+    res.send("Error: Expected id (coin number), nom received")
   }
 });
 
@@ -114,7 +117,7 @@ app.get("/getSelectChimes", async function(req, res){
           res.send(context.rows);
         }
         else {
-          res.send("No coin found");
+          res.send("No records found");
         }
       });
     } catch (e) {
@@ -122,6 +125,9 @@ app.get("/getSelectChimes", async function(req, res){
     } finally {
       await client.release();
     }
+  }
+  else {
+    res.send("Error: Expected id (coin number or title), none received")
   }
 });
 
