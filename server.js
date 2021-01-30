@@ -70,29 +70,26 @@ app.get("/allChimes", async function(req, res){
 
 app.get("/getCoin", async function(req, res){
   const client = await pool.connect();
+  let context;
   if (req.query.id){
     try {
-      let getCoin = {
-        text: get_coin,
-        placeholder_arr: [req.query.id],
-      };
       //execute the query and the send the results back to the client
-      executeParameterQuery(client, getCoin, function(context){
-        if (context.rowCount >= 1){
-          res.send(context.rows);
-        }
-        else {
-          res.send("Error: No coin found");
-        }
-      });
+      context = await executeQuery(client, get_coin, [req.query.id]);
     } catch (e) {
       throw (e);
     } finally {
-      await client.release();
+      client.release();
+    }
+
+    if (context && context.length == 1){
+      res.send(context[0]);
+    }
+    else {
+      res.send("Error: No coin found");
     }
   }
   else {
-    res.send("Error: Expected id (coin number), nom received")
+    res.send("Error: Expected id (coin number), none received")
   }
 });
 
@@ -123,7 +120,7 @@ app.get("/getSelectChimes", async function(req, res){
     } catch (e) {
       throw (e);
     } finally {
-      await client.release();
+      client.release();
     }
   }
   else {
@@ -151,6 +148,38 @@ app.get("/getSelectChimes", async function(req, res){
  * Returns: chime_id, coin_id, coin_num, title, description,
  * first_name, last_name, email, latitude, longitude 
 *********************************************************/
+
+app.post("/addChime2", async function(req, res){
+  let client = null;
+  try {
+    client = await pool.connect();
+  } catch (error) {
+      console.log('A client pool error occurred:', error);
+      return error;
+  }
+
+  let coin_id
+  (async () => {
+    try {
+      await client.query('BEGIN');
+      coin_id = await entryExists(client, req.body.coin_num, 'coin');
+    }
+    catch (error) {
+      try {
+          await client.query('ROLLBACK');
+      } catch (rollbackError) {
+          console.log('A rollback error occurred:', rollbackError);
+      }
+      console.log('An error occurred:', error);
+      return error;
+    } finally {
+        client.query('COMMIT')
+        client.release();
+        console.log(coin_id[0]['id'])
+        return coin_id[0]['id']
+    }
+  })();
+})
 
 app.post("/addChime", async function(req, res){ 
   const client = await pool.connect()
@@ -219,6 +248,24 @@ app.post("/addChime", async function(req, res){
 
 
 /************************ Query Execution Functions **************************/
+
+/*********************************************************
+entryExists: 
+Checks if the entry already exists.
+*********************************************************/
+async function entryExists(client, unique_identifier, type){
+  queryCheckLookup = {
+    coin: isCoin,
+    user: isUser,
+  };
+
+  queryInsertLookup = {
+    coin: insertCoin,
+    user: insertUser,
+  };
+
+  return await executeQuery(client, queryCheckLookup[type], [unique_identifier]);
+}
 
 /*********************************************************
 addIfNotExist: 
@@ -313,14 +360,14 @@ the client
 Receives: query - query string; callback - callback function
 Returns: nothing (sends back rows to callback function)
 *********************************************************/
-async function executeQuery(client, query) {
+async function executeQuery(client, query, params = []) {
   let response;
   try {
-    response = await client.query(query);
+    response = await client.query(query, params);
   } catch (error) {
     console.log("ERROR: ", error);
   }
-  return response.rows;
+  return response ? response.rows : null;
 }
 
 /*********************************************************
