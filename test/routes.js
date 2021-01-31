@@ -101,15 +101,58 @@ describe ("getSelectChimes Handle", () => {
 });
 
 describe ("addChime handle", () => {
-  it ("should return 200", async () => {
+  it ("should return 200 with coin_num, lat, long, title", async () => {
     (async() => {
       let res = await chai
         .request('http://localhost:3500')
         .post('/addChime2')
         .set('content-type', 'application/x-www-form-urlencoded')
         .send({coin_num: 'testy test', lat: '123', long: '456', title: 'Testing post', test: true});
-      console.log(res.text);
       expect(res.status).to.equal(200);
+    });
+  });
+
+  it ("should return error without coin_num", async () => {
+    (async() => {
+      let res = await chai
+        .request('http://localhost:3500')
+        .post('/addChime2')
+        .set('content-type', 'application/x-www-form-urlencoded')
+        .send({lat: '123', long: '456', title: 'Testing post', test: true});
+      expect(res.text).to.equal('Error: must provide coin_num, lat, long and title');
+    });
+  });
+
+  it ("should return error without title", async () => {
+    (async() => {
+      let res = await chai
+        .request('http://localhost:3500')
+        .post('/addChime2')
+        .set('content-type', 'application/x-www-form-urlencoded')
+        .send({coin_num: 'testy test', lat: '123', long: '456', title: 'Testing post', test: true});
+      expect(res.text).to.equal('Error: must provide coin_num, lat, long and title');
+    });
+  });
+
+  it ("should return error without lat", async () => {
+    (async() => {
+      let res = await chai
+        .request('http://localhost:3500')
+        .post('/addChime2')
+        .set('content-type', 'application/x-www-form-urlencoded')
+        .send({coin_num: 'testy test', long: '456', title: 'Testing post', test: true});
+      expect(res.text).to.equal('Error: must provide coin_num, lat, long and title');
+    });
+  });
+
+  it ("should return error without long", async () => {
+    (async() => {
+      let res = await chai
+        .request('http://localhost:3500')
+        .post('/addChime2')
+        .set('content-type', 'application/x-www-form-urlencoded')
+        .send({coin_num: 'testy test', lat: '123', title: 'Testing post', test: true});
+      expect(res.text).to.equal('Error: must provide coin_num, lat, long and title');
     });
   });
 });

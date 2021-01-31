@@ -268,23 +268,22 @@ app.post("/addChime2", async function(req, res){
     }
     error('An error adding a chime occurred that triggered the catch: ' + error, res);
   } finally {
-    if (req.body.test){
-      rollback(client);
-    }
-    else {
-      await client.query('COMMIT');
+    //return new chime 
+    const context = await client.query(get_chime, [chime])
+      
+    if (context.rowCount != 1){
+      error("Error: couldn't retrieve new chime", res);
     }
 
-    //return new chime 
-    client.query(get_chime, [chime])
-    .then((context) => {
-      if (context.rowCount == 1){
-        res.send(context['rows']);
-      }
-      else {
-        error("Error: couldn't retrieve new chime", res);
-      }
-    });
+    if (!req.body.test){
+      await client.query('COMMIT');
+      res.send(context['rows']);
+    }
+    else {
+      await rollback(client);
+      console.log('test query rolled back');
+      res.send(context['rows']);
+    }
     client.release();
   }
 });
