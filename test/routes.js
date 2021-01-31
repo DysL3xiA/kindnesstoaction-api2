@@ -101,14 +101,15 @@ describe ("getSelectChimes Handle", () => {
 });
 
 describe ("addChime handle", () => {
-  it ("should check if coin_id already exists and not add new", async () => {
+  it ("should return 200", async () => {
     (async() => {
       let res = await chai
         .request('http://localhost:3500')
         .post('/addChime2')
         .set('content-type', 'application/x-www-form-urlencoded')
-        .send({coin_num: '012104'});
-      expect(res.text).to.equal(3)
+        .send({coin_num: 'testy test', lat: '123', long: '456', title: 'Testing post', test: true});
+      console.log(res.text);
+      expect(res.status).to.equal(200);
     });
   });
 });

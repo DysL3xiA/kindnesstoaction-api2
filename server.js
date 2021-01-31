@@ -50,16 +50,15 @@ app.get("/", function(req, res){
 
 app.get("/allChimes", async function(req, res){
   const client = await pool.connect();
-  let context;
   try {
     //execute the query and the send the results back to the client
-    context = await executeQuery(client, all_chimes);
+    const context = await client.query(all_chimes);
+    res.send(context);
   } catch (e) {
     throw (e);
   } finally {
     client.release();
   }
-  res.send(context);
 });
 
 /*********************************************************
@@ -70,22 +69,20 @@ app.get("/allChimes", async function(req, res){
 
 app.get("/getCoin", async function(req, res){
   const client = await pool.connect();
-  let context;
   if (req.query.id){
     try {
       //execute the query and the send the results back to the client
-      context = await executeQuery(client, get_coin, [req.query.id]);
+      const context = await client.query(get_coin, [req.query.id]);
+      if (context && context.length == 1){
+        res.send(context[0]);
+      }
+      else {
+        res.send("Error: No coin found");
+      }
     } catch (e) {
-      throw (e);
+      console.error(e);
     } finally {
       client.release();
-    }
-
-    if (context && context.length == 1){
-      res.send(context[0]);
-    }
-    else {
-      res.send("Error: No coin found");
     }
   }
   else {
@@ -104,21 +101,16 @@ app.get("/getSelectChimes", async function(req, res){
   const client = await pool.connect();
   if (req.query.id){
     try {
-      let getSelectChimes = {
-        text: get_select_chimes,
-        placeholder_arr: [req.query.id],
-      };
       //execute the query and the send the results back to the client
-      executeParameterQuery(client, getSelectChimes, function(context){
-        if (context.rowCount >= 1){
-          res.send(context.rows);
-        }
-        else {
-          res.send("No records found");
-        }
-      });
+      const context = await client.query(get_select_chimes, [req.query.id]);
+      if (context.rowCount >= 1){
+        res.send(context.rows);
+      }
+      else {
+        res.send("No records found");
+      }
     } catch (e) {
-      throw (e);
+      console.error(e);
     } finally {
       client.release();
     }
@@ -150,89 +142,150 @@ app.get("/getSelectChimes", async function(req, res){
 *********************************************************/
 
 app.post("/addChime2", async function(req, res){
+  if (!req.body.coin_num || 
+    !req.body.lat || 
+    !req.body.long ||
+    !req.body.title) {
+    res.send("Error: must provide coin_num, lat, long and title")
+    return;
+  }
+
   let client = null;
   try {
     client = await pool.connect();
   } catch (error) {
-      console.log('A client pool error occurred:', error);
+      error('A client pool error occurred:' + error, res);
       return error;
   }
 
-  let coin_id
-  (async () => {
-    try {
-      await client.query('BEGIN');
-      coin_id = await entryExists(client, req.body.coin_num, 'coin');
-    }
-    catch (error) {
-      try {
-          await client.query('ROLLBACK');
-      } catch (rollbackError) {
-          console.log('A rollback error occurred:', rollbackError);
-      }
-      console.log('An error occurred:', error);
-      return error;
-    } finally {
-        client.query('COMMIT')
-        client.release();
-        console.log(coin_id[0]['id'])
-        return coin_id[0]['id']
-    }
-  })();
-})
-
-app.post("/addChime", async function(req, res){ 
-  const client = await pool.connect()
-  .catch(err => console.error('Error executing query', err.stack))
+  let chime;
   try {
-    client.query('BEGIN')
-    .then(() => {
-      addIfNotExist(client, req.body.coin_num, [req.body.coin_num], 'coin')
-      .then((coin_id) => {
-        if (coin_id == -1){
-          res.send("Unable to insert coin");
+    await client.query('BEGIN');
+
+    // get coin id
+    let coin_id = await client.query(isCoin, [req.body.coin_num]);
+    if (coin_id.rowCount == 1) {
+      coin_id = coin_id['rows'][0]['id'];
+    }
+    else {
+      const inserted_coin = await client.query(insertCoin, [req.body.coin_num]);
+      if (inserted_coin.rowCount == 1){
+        coin_id = inserted_coin['rows'][0]['id'];
+      }
+      else {
+        rollback(client);
+      }
+    }
+
+    // add chime; coin_id, title required
+    chime = await client.query(insertChime, [coin_id, req.body.title, req.body.description || 'null',
+    req.body.image || 'null'])
+    if (chime.rowCount != 1){
+      error("Error: could not insert chime", res);
+      rollback(client);
+    }
+    else {
+      chime = chime['rows'][0]['id'];
+    }
+
+    // add giver (not required); check giver name versus database
+    let giver;
+    if (req.body.giver){
+      giver = await client.query(isUserName, [req.body.giver]);
+      if (giver.rowCount == 1) {
+        giver = giver['rows'][0]['id'];
+      }
+      else {
+        const inserted_giver = await client.query(insertUser, [req.body.giver, 'null', 'FALSE']);
+        if (inserted_giver.rowCount == 1){
+          giver = inserted_giver['rows'][0]['id'];
         }
         else {
-          // add chime and user
-          let chime_id = Promise.resolve(
-            addRelation(client, [coin_id, req.body.title, req.body.description || 'null',
-            req.body.image || 'null'], 'chime')
-            );
-          const user_id = Promise.resolve(
-            addIfNotExist(client, req.body.email || null, [req.body.first_name, 
-              req.body.last_name, req.body.email || null, 'FALSE'], 'user')
-          );
-          // need to add logic to check if address exists
-          const address_id = Promise.resolve(
-            addRelation(client, [req.body.latitude, req.body.longitude], 'address')
-          );
-          // once chime and user are added, add chime_user relation
-          Promise.all([chime_id, user_id, address_id])
-          .then((values) => {
-            chime_id = values[0];
-            const chime_user = addRelation(client, [values[0], values[1]], 'chime_user');
-            const chime_address = addRelation(client, [values[0], values[2]], 'chime_address'); 
-            Promise.all([chime_user, chime_address])
-            .then(() => {
-              let new_chime = {
-                text: get_chime,
-                placeholder_arr: [chime_id],
-              };
-              executeParameterQuery(client, new_chime, function(context){
-                client.query('COMMIT');
-                res.send(context);
-                client.release();
-              });
-            });
-          })
+          error("Error: couldn't insert giver", res);
+          rollback(client);
         }
-      });
-    })
-  } catch (e) {
-    console.log("blarb");
-    await client.query('ROLLBACK');
-    await client.release(e);
-    throw e;
+      }
+    }
+
+    // add receiver (not required); check receiver name and email v database
+    let receiver;
+    if (req.body.receiver || req.body.email){
+      receiver = await client.query(isUserNameEmail, [req.body.receiver, req.body.email || 'null']);
+      if (giver.rowCount == 1) {
+        receiver = receiver['rows'][0]['id'];
+      }
+      else {
+        const inserted_receiver = await client.query(insertUser, [req.body.receiver, req.body.email ? req.body.email : 'null', 'FALSE']);
+        if (inserted_receiver.rowCount == 1){
+          receiver = inserted_receiver['rows'][0]['id'];
+        }
+        else {
+          error("Error: couldn't insert receiver", res);
+          rollback(client);
+        }
+      }
+    }
+
+    // get address (required); requires lat/long
+    let address_id = await client.query(isAddress, [req.body.lat, req.body.long]);
+    if (address_id.rowCount == 1){
+      address_id = address_id['rows'][0]['id'];
+    }
+    else {
+      const inserted_address = await client.query(insertAddress, [req.body.lat, req.body.long]);
+      if (inserted_address.rowCount == 1){
+        address_id = inserted_address['rows'][0]['id'];
+      }
+      else {
+        error("Error: couldn't insert address", res);
+        rollback(client);
+      }
+    }
+
+    // chime_user relation for giver
+    if (giver){
+      const chime_giver = await client.query(insertChimeUser, [chime, giver]);
+      if (chime_giver.rowCount != 1){
+        error("Error: couldn't insert giver chime_user relation", res);
+        rollback(client);
+      }
+    }
+
+    // chime_user relation for receiver
+    if (receiver){
+      const chime_receiver = await client.query(insertChimeUser, [chime, receiver]);
+      if (chime_receiver.rowCount != 1){
+        error("Error: couldn't insert giver chime_user relation", res);
+        rollback(client);
+      }
+    }
+  }
+  catch (error) {
+    try {
+        await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      error('A rollback error occurred:' + rollbackError, res);
+    }
+    error('An error adding a chime occurred that triggered the catch: ' + error, res);
+  } finally {
+    if (req.body.test){
+      rollback(client);
+    }
+    else {
+      await client.query('COMMIT');
+    }
+
+    //return new chime 
+    client.query(get_chime, [chime])
+    .then((context) => {
+      if (context.rowCount == 1){
+        res.send(context['rows']);
+      }
+      else {
+        error("Error: couldn't retrieve new chime", res);
+      }
+    });
+    client.release();
   }
 });
 
@@ -249,6 +302,19 @@ app.post("/addChime", async function(req, res){
 
 /************************ Query Execution Functions **************************/
 
+async function rollback(client) {
+  try {
+    await client.query('ROLLBACK');
+  } catch (rollbackError) {
+    console.error('A rollback error occurred:', rollbackError);
+  }
+}
+
+function error(message, res) {
+  console.error(message);
+  res.send( {'error': message} );
+}
+
 /*********************************************************
 entryExists: 
 Checks if the entry already exists.
@@ -264,7 +330,18 @@ async function entryExists(client, unique_identifier, type){
     user: insertUser,
   };
 
-  return await executeQuery(client, queryCheckLookup[type], [unique_identifier]);
+  let result;
+  console.log(unique_identifier);
+
+  (async () => {
+    try {
+    result = await executeQuery(client, queryCheckLookup[type], [unique_identifier]);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      return result ? result[0]['id'] : -1;
+    }
+  })();
 }
 
 /*********************************************************
@@ -577,7 +654,7 @@ RETURNING id;`;
 *************************************************/
 const insertUser = 
 `INSERT INTO users (name, email, is_ambassador)
-VALUES ($1, $2, $3, $4)
+VALUES ($1, $2, $3)
 RETURNING id;`;
 
 /*************************************************
@@ -605,10 +682,16 @@ VALUES ($1, $2)
 RETURNING id;`;
 
 /*************************************************
- * Find if user exists
+ * Find if user exists by name
 *************************************************/
-const isUser = 
-`Select id FROM users where lower(email) = lower($1);`;
+const isUserName = 
+`Select id FROM users where lower(name) = lower($1);`;
+
+/*************************************************
+ * Find if user exists by name or email
+*************************************************/
+const isUserNameEmail = 
+`Select id FROM users where lower(name) = lower($1) OR lower(email) = lower($2);`;
 
 /*************************************************
  * Find if address exists
