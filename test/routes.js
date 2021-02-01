@@ -22,7 +22,7 @@ describe ("All Chimes Handle", () => {
 });
 
 describe ("getCoin Handle", () => {
-  let response = '{"chime_id":5,"coin_id":3,"coin_num":"012104","title":"It all starts here.","description":"Elijah James Knight infuses the world with light and joy. 3 weeks before his tragic death, he made this profound statement: \\"Start everything with kindness and the end will be okay.\\" Through his example, Elijah inspires us to turn kindness to action according to our unique talents and interests to remake the world as it should be. If you have received a Kindness Coin, thank you for doing the work of kindness. Now, recognize and encourage others to go do! https://www.dignitymemorial.com/obituaries/houston-tx/elijah-knight-7898454","image":null,"giver":null,"receiver":"Elijah Knight","latitude":"29.9717","longitude":"-95.6938"}';
+  let response = '[{"chime_id":5,"coin_id":3,"coin_num":"012104","title":"It all starts here.","description":"Elijah James Knight infuses the world with light and joy. 3 weeks before his tragic death, he made this profound statement: \\"Start everything with kindness and the end will be okay.\\" Through his example, Elijah inspires us to turn kindness to action according to our unique talents and interests to remake the world as it should be. If you have received a Kindness Coin, thank you for doing the work of kindness. Now, recognize and encourage others to go do! https://www.dignitymemorial.com/obituaries/houston-tx/elijah-knight-7898454","image":null,"latitude":"29.9717","longitude":"-95.6938"}]';
   it ("should return status 200", async () => {
     let res = await chai
         .request('http://localhost:3500')
@@ -57,7 +57,7 @@ describe ("getCoin Handle", () => {
 });
 
 describe ("getSelectChimes Handle", () => {
-  response = '[{"chime_id":5,"coin_id":3,"coin_num":"012104","title":"It all starts here.","description":"Elijah James Knight infuses the world with light and joy. 3 weeks before his tragic death, he made this profound statement: \"Start everything with kindness and the end will be okay.\" Through his example, Elijah inspires us to turn kindness to action according to our unique talents and interests to remake the world as it should be. If you have received a Kindness Coin, thank you for doing the work of kindness. Now, recognize and encourage others to go do! https://www.dignitymemorial.com/obituaries/houston-tx/elijah-knight-7898454","image":null,"giver":null,"receiver":"Elijah Knight","latitude":"29.9717","longitude":"-95.6938"}]';
+  let response = '[{"chime_id":5,"coin_id":3,"coin_num":"012104","title":"It all starts here.","description":"Elijah James Knight infuses the world with light and joy. 3 weeks before his tragic death, he made this profound statement: \\"Start everything with kindness and the end will be okay.\\" Through his example, Elijah inspires us to turn kindness to action according to our unique talents and interests to remake the world as it should be. If you have received a Kindness Coin, thank you for doing the work of kindness. Now, recognize and encourage others to go do! https://www.dignitymemorial.com/obituaries/houston-tx/elijah-knight-7898454","image":null,"latitude":"29.9717","longitude":"-95.6938"}]';
   
   it ("should return status 200 with coin number", async () => {
     let res = await chai
@@ -80,7 +80,7 @@ describe ("getSelectChimes Handle", () => {
         .request('http://localhost:3500')
         .get('/getSelectChimes?id=012104');
     
-    console.log(res.text);
+    expect(res.text).to.equal(response);
   })
 
   it ("should return error if no id", async () => {
@@ -105,7 +105,7 @@ describe ("addChime handle", () => {
     (async() => {
       let res = await chai
         .request('http://localhost:3500')
-        .post('/addChime2')
+        .post('/addChime')
         .set('content-type', 'application/x-www-form-urlencoded')
         .send({coin_num: 'testy test', lat: '123', long: '456', title: 'Testing post', test: true});
       expect(res.status).to.equal(200);
@@ -116,7 +116,7 @@ describe ("addChime handle", () => {
     (async() => {
       let res = await chai
         .request('http://localhost:3500')
-        .post('/addChime2')
+        .post('/addChime')
         .set('content-type', 'application/x-www-form-urlencoded')
         .send({lat: '123', long: '456', title: 'Testing post', test: true});
       expect(res.text).to.equal('Error: must provide coin_num, lat, long and title');
@@ -127,7 +127,7 @@ describe ("addChime handle", () => {
     (async() => {
       let res = await chai
         .request('http://localhost:3500')
-        .post('/addChime2')
+        .post('/addChime')
         .set('content-type', 'application/x-www-form-urlencoded')
         .send({coin_num: 'testy test', lat: '123', long: '456', title: 'Testing post', test: true});
       expect(res.text).to.equal('Error: must provide coin_num, lat, long and title');
@@ -138,7 +138,7 @@ describe ("addChime handle", () => {
     (async() => {
       let res = await chai
         .request('http://localhost:3500')
-        .post('/addChime2')
+        .post('/addChime')
         .set('content-type', 'application/x-www-form-urlencoded')
         .send({coin_num: 'testy test', long: '456', title: 'Testing post', test: true});
       expect(res.text).to.equal('Error: must provide coin_num, lat, long and title');
@@ -149,7 +149,7 @@ describe ("addChime handle", () => {
     (async() => {
       let res = await chai
         .request('http://localhost:3500')
-        .post('/addChime2')
+        .post('/addChime')
         .set('content-type', 'application/x-www-form-urlencoded')
         .send({coin_num: 'testy test', lat: '123', title: 'Testing post', test: true});
       expect(res.text).to.equal('Error: must provide coin_num, lat, long and title');

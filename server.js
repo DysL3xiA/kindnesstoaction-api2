@@ -73,8 +73,8 @@ app.get("/getCoin", async function(req, res){
     try {
       //execute the query and the send the results back to the client
       const context = await client.query(get_coin, [req.query.id]);
-      if (context && context.length == 1){
-        res.send(context[0]);
+      if (context && context.rowCount == 1){
+        res.send(context.rows);
       }
       else {
         res.send("Error: No coin found");
@@ -141,7 +141,7 @@ app.get("/getSelectChimes", async function(req, res){
  * first_name, last_name, email, latitude, longitude 
 *********************************************************/
 
-app.post("/addChime2", async function(req, res){
+app.post("/addChime", async function(req, res){
   if (!req.body.coin_num || 
     !req.body.lat || 
     !req.body.long ||
@@ -512,8 +512,6 @@ const all_chimes =
   ch.title,
   ch.description,
   ch.image,
-  cu.user_name as giver,
-  cu2.user_name as receiver,
   aa.latitude,
   aa.longitude
   
@@ -547,8 +545,6 @@ cc.coin_num,
 ch.title,
 ch.description,
 ch.image,
-cu.user_name as giver,
-cu2.user_name as receiver,
 aa.latitude,
 aa.longitude
 
@@ -583,8 +579,6 @@ const get_select_chimes = `WITH chime_users as (
   ch.title,
   ch.description,
   ch.image,
-  cu.user_name as giver,
-  cu2.user_name as receiver,
   aa.latitude,
   aa.longitude
   
@@ -618,8 +612,6 @@ cc.coin_num,
 ch.title,
 ch.description,
 ch.image,
-cu.user_name as giver,
-cu2.user_name as receiver,
 aa.latitude,
 aa.longitude
 
