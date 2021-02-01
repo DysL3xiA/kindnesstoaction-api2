@@ -52,41 +52,43 @@ app.get("/allChimes", async function(req, res){
   const client = await pool.connect();
   try {
     //execute the query and the send the results back to the client
-    const context = await client.query(all_chimes);
+    const context = await client.query(all_chimes).catch(err => {error(err)});;
     res.send(context.rows);
   } catch (e) {
-    throw (e);
+    console.error(e);
+    res.status(500).send("Error executing queries: ", e);
   } finally {
     client.release();
   }
 });
 
 /*********************************************************
- * Get single coin based on coin_num
+ * Get all events based on coin_num
  * 
- * Returns single coin's data
+ * Returns coin's data
 **********************************************************/
 
-app.get("/getCoin", async function(req, res){
+app.get("/getCoins", async function(req, res){
   const client = await pool.connect();
   if (req.query.id){
     try {
       //execute the query and the send the results back to the client
-      const context = await client.query(get_coin, [req.query.id]);
-      if (context && context.rowCount == 1){
+      const context = await client.query(get_coin, [req.query.id]).catch(err => {error(err)});;
+      if (context && context.rowCount >= 1){
         res.send(context.rows);
       }
       else {
-        res.send("Error: No coin found");
+        res.status(404).send("Error: No coin found");
       }
     } catch (e) {
       console.error(e);
+      res.status(500).send("Error executing queries: ", e);
     } finally {
       client.release();
     }
   }
   else {
-    res.send("Error: Expected id (coin number), none received")
+    res.status(400).send("Error: Expected id (coin number), none received")
   }
 });
 
@@ -102,21 +104,23 @@ app.get("/getSelectChimes", async function(req, res){
   if (req.query.id){
     try {
       //execute the query and the send the results back to the client
-      const context = await client.query(get_select_chimes, [req.query.id]);
+      const context = await client.query(get_select_chimes, [req.query.id, `%${req.query.id}%`]).catch(err => {error(err)});
       if (context.rowCount >= 1){
         res.send(context.rows);
       }
       else {
-        res.send("No records found");
+        res.status(404).send("No records found");
+        return;
       }
     } catch (e) {
       console.error(e);
+      res.status(500).send("Error executing query: " + e);
     } finally {
       client.release();
     }
   }
   else {
-    res.send("Error: Expected id (coin number or title), none received")
+    res.status(400).send("Error: Expected id (coin number or title), none received")
   }
 });
 
@@ -127,18 +131,18 @@ app.get("/getSelectChimes", async function(req, res){
  * Expects Mandatory Arguments: 
  * title
  * coin_num
- * first_name
- * last_name
- * email
  * latitude
  * longitude
  * 
+ * 
  * Optional Arguments: 
+ * giver
+ * receiver
+ * receiver email
  * description
  * image
  * 
- * Returns: chime_id, coin_id, coin_num, title, description,
- * first_name, last_name, email, latitude, longitude 
+ * Returns: chime_id, coin_id, coin_num, title, description, latitude, longitude, image
 *********************************************************/
 
 app.post("/addChime", async function(req, res){
@@ -154,21 +158,21 @@ app.post("/addChime", async function(req, res){
   try {
     client = await pool.connect();
   } catch (error) {
-      error('A client pool error occurred:' + error, res);
+      error('A client pool error occurred:' + error);
       return error;
   }
 
   let chime;
   try {
-    await client.query('BEGIN');
+    await client.query('BEGIN').catch(err => {error(err)});
 
     // get coin id
-    let coin_id = await client.query(isCoin, [req.body.coin_num]);
+    let coin_id = await client.query(isCoin, [req.body.coin_num]).catch(err => {error(err)});
     if (coin_id.rowCount == 1) {
       coin_id = coin_id['rows'][0]['id'];
     }
     else {
-      const inserted_coin = await client.query(insertCoin, [req.body.coin_num]);
+      const inserted_coin = await client.query(insertCoin, [req.body.coin_num]).catch(err => {error(err)});
       if (inserted_coin.rowCount == 1){
         coin_id = inserted_coin['rows'][0]['id'];
       }
@@ -179,9 +183,9 @@ app.post("/addChime", async function(req, res){
 
     // add chime; coin_id, title required
     chime = await client.query(insertChime, [coin_id, req.body.title, req.body.description || 'null',
-    req.body.image || 'null'])
+    req.body.image || 'null']).catch(err => {error(err)});
     if (chime.rowCount != 1){
-      error("Error: could not insert chime", res);
+      error("Error: could not insert chime");
       rollback(client);
     }
     else {
@@ -191,17 +195,17 @@ app.post("/addChime", async function(req, res){
     // add giver (not required); check giver name versus database
     let giver;
     if (req.body.giver){
-      giver = await client.query(isUserName, [req.body.giver]);
+      giver = await client.query(isUserName, [req.body.giver]).catch(err => {error(err)});
       if (giver.rowCount == 1) {
         giver = giver['rows'][0]['id'];
       }
       else {
-        const inserted_giver = await client.query(insertUser, [req.body.giver, 'null', 'FALSE']);
+        const inserted_giver = await client.query(insertUser, [req.body.giver, 'null', 'FALSE']).catch(err => {error(err)});
         if (inserted_giver.rowCount == 1){
           giver = inserted_giver['rows'][0]['id'];
         }
         else {
-          error("Error: couldn't insert giver", res);
+          error("Error: couldn't insert giver");
           rollback(client);
         }
       }
@@ -210,66 +214,148 @@ app.post("/addChime", async function(req, res){
     // add receiver (not required); check receiver name and email v database
     let receiver;
     if (req.body.receiver || req.body.email){
-      receiver = await client.query(isUserNameEmail, [req.body.receiver, req.body.email || 'null']);
-      if (giver.rowCount == 1) {
+      receiver = await client.query(isUserNameEmail, [req.body.receiver, req.body.email || 'null']).catch(err => {error(err)});
+      if (receiver.rowCount == 1) {
         receiver = receiver['rows'][0]['id'];
       }
       else {
-        const inserted_receiver = await client.query(insertUser, [req.body.receiver, req.body.email ? req.body.email : 'null', 'FALSE']);
+        const inserted_receiver = await client.query(insertUser, [req.body.receiver, req.body.email ? req.body.email : 'null', 'FALSE']).catch(err => {error(err)});
         if (inserted_receiver.rowCount == 1){
           receiver = inserted_receiver['rows'][0]['id'];
         }
         else {
-          error("Error: couldn't insert receiver", res);
+          error("Error: couldn't insert receiver");
           rollback(client);
         }
       }
     }
 
     // get address (required); requires lat/long
-    let address_id = await client.query(isAddress, [req.body.lat, req.body.long]);
+    let address_id = await client.query(isAddress, [req.body.lat, req.body.long]).catch(err => {error(err)});
     if (address_id.rowCount == 1){
       address_id = address_id['rows'][0]['id'];
     }
     else {
-      const inserted_address = await client.query(insertAddress, [req.body.lat, req.body.long]);
+      const inserted_address = await client.query(insertAddress, [req.body.lat, req.body.long]).catch(err => {error(err)});
       if (inserted_address.rowCount == 1){
         address_id = inserted_address['rows'][0]['id'];
       }
       else {
-        error("Error: couldn't insert address", res);
+        error("Error: couldn't insert address");
         rollback(client);
       }
     }
 
     // chime_user relation for giver
     if (giver){
-      const chime_giver = await client.query(insertChimeUser, [chime, giver]);
+      const chime_giver = await client.query(insertChimeUser, [chime, giver]).catch(err => {error(err)});
       if (chime_giver.rowCount != 1){
-        error("Error: couldn't insert giver chime_user relation", res);
+        error("Error: couldn't insert giver chime_user relation");
         rollback(client);
       }
     }
 
     // chime_user relation for receiver
     if (receiver){
-      const chime_receiver = await client.query(insertChimeUser, [chime, receiver]);
+      const chime_receiver = await client.query(insertChimeUser, [chime, receiver]).catch(err => {error(err)});
       if (chime_receiver.rowCount != 1){
-        error("Error: couldn't insert giver chime_user relation", res);
+        error("Error: couldn't insert giver chime_user relation");
         rollback(client);
       }
     }
-  }
-  catch (error) {
-    try {
-        await client.query('ROLLBACK');
-    } catch (rollbackError) {
-      error('A rollback error occurred:' + rollbackError, res);
+
+    // chime address relation
+    const chime_address = await client.query(insertChimeAddress, [chime, address_id]).catch(err => {error(err)});
+    if (chime_address.rowCount != 1){
+      error("Error: couldn't insert chime_address relation");
+      rollback(client);
     }
-    error('An error adding a chime occurred that triggered the catch: ' + error, res);
+
+  //return new chime 
+  const context = await client.query(get_chime, [chime]).catch(err => {error(err)});
+      
+  if (context.rowCount != 1){
+    error("Error: couldn't retrieve new chime");
+  }
+
+  if (!req.body.test){
+    await client.query('COMMIT').catch(err => {error(err)});
+    res.send(context['rows']);
+  }
+  else {
+    await rollback(client);
+    console.log('test query rolled back');
+    res.send(context['rows']);
+  }
+}
+  catch (error) {
+    console.log('in catch');
+    try {
+        await client.query('ROLLBACK').catch(err => {error(err)});
+    } catch (rollbackError) {
+      error('A rollback error occurred:' + rollbackError);
+    }
+    res.send('An error adding a chime occurred that triggered the catch: ' + error);
   } finally {
-    //return new chime 
-    const context = await client.query(get_chime, [chime])
+    client.release();
+  }
+});
+
+/*********************************************************
+ * Add Ambassador Handle
+ * 
+ * Expects Mandatory Arguments: 
+ * name
+ * email
+ * 
+ * Optional: 
+ * phone
+*********************************************************/
+
+app.post("/addAmbassador", async function(req, res){
+  if (!req.body.name || 
+    !req.body.email) {
+    res.send("Error: must provide name and email to become ambassador")
+    return;
+  }
+
+  let client = null;
+  try {
+    client = await pool.connect();
+  } catch (error) {
+      error('A client pool error occurred:' + error, res);
+      return error;
+  }
+
+  let ambassador
+  try {
+    await client.query('BEGIN');
+
+    // only check emails because we don't want to overwrite someone who has the same name
+    ambassador = await client.query(isUserEmail, [req.body.email]);
+    console.log(ambassador.rows);
+    
+    if (ambassador.rowCount == 1 && ambassador.rows['is_ambassador'] == 'FALSE'){
+      if (!req.body.phone){
+        ambassador = await client.query(updateAmbassador, [ambassador.rows['id'], 'TRUE', req.body.name, req.body.email]);
+      }
+      else {
+        ambassador = await client.query(updateAmbassadorWithPhone, [ambassador.rows['id'], 'TRUE', req.body.name, req.body.email, req.body.phone]);
+      }
+    }
+    else if (ambassador.rowCount == 0) {
+      ambassador = await client.query(insertUserWithPhone, [req.body.name, req.body.email, req.body.phone || 'null', 'TRUE']);
+    }
+
+  } catch(error) {
+      try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          error('A rollback error occurred:' + rollbackError, res);
+        }
+        error('An error adding a chime occurred that triggered the catch: ' + error, res);
+  } finally {
+    const context = await client.query(get_chime, [chime]);
       
     if (context.rowCount != 1){
       error("Error: couldn't retrieve new chime", res);
@@ -288,16 +374,6 @@ app.post("/addChime", async function(req, res){
   }
 });
 
-/*********************************************************
- * Add Ambassador Handle
- * 
- * Expects Mandatory Arguments: 
- * first_name
- * last_name
- * email
-*********************************************************/
-
-
 
 /************************ Query Execution Functions **************************/
 
@@ -309,9 +385,9 @@ async function rollback(client) {
   }
 }
 
-function error(message, res) {
+function error(message) {
   console.error(message);
-  res.send( {'error': message} );
+  throw message;
 }
 
 /************************ Queries to run **************************/
@@ -333,8 +409,6 @@ const all_chimes =
   )
   
   select distinct 
-  ch.id as chime_id,
-  cc.id as coin_id,
   cc.coin_num,
   ch.title,
   ch.description,
@@ -366,8 +440,6 @@ const get_chime =
   )
   
 select distinct
-ch.id as chime_id,
-cc.id as coin_id,
 cc.coin_num,
 ch.title,
 ch.description,
@@ -400,8 +472,6 @@ const get_select_chimes = `WITH chime_users as (
   )
   
   select distinct 
-  ch.id as chime_id,
-  cc.id as coin_id,
   cc.coin_num,
   ch.title,
   ch.description,
@@ -415,7 +485,7 @@ const get_select_chimes = `WITH chime_users as (
   left join addresses aa on aa.id = ca.address_id
   left join chime_users cu on cu.chime_id = ch.id and cu.user_type_name = 'Receiver'
   left join chime_users cu2 on cu2.chime_id = ch.id and cu2.user_type_name = 'Giver'
-  where cc.coin_num = ($1) OR ch.title = ($1);`;
+  where cc.coin_num = ($1) OR ch.title ilike ($2);`;
 
 /*************************************************
  * Get single coin
@@ -433,8 +503,6 @@ const get_coin =
   )
 
 select distinct
-ch.id as chime_id,
-cc.id as coin_id,
 cc.coin_num,
 ch.title,
 ch.description,
@@ -471,9 +539,17 @@ RETURNING id;`;
  * Insert new user
 *************************************************/
 const insertUser = 
-`INSERT INTO users (name, email, is_ambassador)
+`INSERT INTO users (user_name, email, is_ambassador)
 VALUES ($1, $2, $3)
-RETURNING id;`;
+RETURNING id, is_ambassador;`;
+
+/*************************************************
+ * Insert new user with phone
+*************************************************/
+const insertUserWithPhone = 
+`INSERT INTO users (user_name, email, phone, is_ambassador)
+VALUES ($1, $2, $3, $4)
+RETURNING id, is_ambassador;`;
 
 /*************************************************
  * Insert new address
@@ -500,16 +576,40 @@ VALUES ($1, $2)
 RETURNING id;`;
 
 /*************************************************
+ * Update user to ambassador
+*************************************************/
+const updateAmbassador = 
+`UPDATE users 
+SET is_ambassador = ($2), user_name = ($3), email = ($4), updated_at = Now()
+WHERE id = ($1)
+RETURNING *;`;
+
+/*************************************************
+ * Update user to ambassador
+*************************************************/
+const updateAmbassadorWithPhone = 
+`UPDATE users 
+SET is_ambassador = ($2), user_name = ($3), email = ($4), phone = ($5), updated_at = Now()
+WHERE id = ($1)
+RETURNING *;`;
+
+/*************************************************
  * Find if user exists by name
 *************************************************/
 const isUserName = 
-`Select id FROM users where lower(name) = lower($1);`;
+`Select * FROM users where lower(user_name) = lower($1);`;
+
+/*************************************************
+ * Find if user exists by email
+*************************************************/
+const isUserEmail = 
+`Select * FROM users where lower(email) = lower($1);`;
 
 /*************************************************
  * Find if user exists by name or email
 *************************************************/
 const isUserNameEmail = 
-`Select id FROM users where lower(name) = lower($1) OR lower(email) = lower($2);`;
+`Select * FROM users where lower(user_name) = lower($1) OR lower(email) = lower($2);`;
 
 /*************************************************
  * Find if address exists
