@@ -107,12 +107,28 @@ describe ("getSelectChimes Handle", () => {
     expect(res.text).to.equal('Error: Expected id (coin number or title), none received');
   })
 
-  it ("should return cannot find if id not find", async () => {
+  it ("should return 400 if no id", async () => {
+    let res = await chai
+        .request('http://localhost:3500')
+        .get('/getSelectChimes');
+    
+    expect(res.status).to.equal(400);
+  })
+
+  it ("should return cannot find if no record found", async () => {
     let res = await chai
         .request('http://localhost:3500')
         .get('/getSelectChimes?id=12');
     
     expect(res.text).to.equal('No records found');
+  })
+
+  it ("should return 404 if no record found", async () => {
+    let res = await chai
+        .request('http://localhost:3500')
+        .get('/getSelectChimes?id=12');
+    
+    expect(res.status).to.equal(404);
   })
 });
 
