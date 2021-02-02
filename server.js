@@ -49,7 +49,7 @@ app.get("/", function(req, res){
 **********************************************************/
 
 app.get("/allChimes", async function(req, res){
-  const client = await pool.connect();
+  const client = await pool.connect().catch(err => {error(err)});
   try {
     //execute the query and the send the results back to the client
     const context = await client.query(all_chimes).catch(err => {error(err)});;
@@ -69,7 +69,7 @@ app.get("/allChimes", async function(req, res){
 **********************************************************/
 
 app.get("/getCoins", async function(req, res){
-  const client = await pool.connect();
+  const client = await pool.connect().catch(err => {error(err)});
   if (req.query.id){
     try {
       //execute the query and the send the results back to the client
@@ -100,7 +100,7 @@ app.get("/getCoins", async function(req, res){
 **********************************************************/
 
 app.get("/getSelectChimes", async function(req, res){
-  const client = await pool.connect();
+  const client = await pool.connect().catch(err => {error(err)});
   if (req.query.id){
     try {
       //execute the query and the send the results back to the client
@@ -150,17 +150,12 @@ app.post("/addChime", async function(req, res){
     !req.body.lat || 
     !req.body.long ||
     !req.body.title) {
-    res.send("Error: must provide coin_num, lat, long and title")
+    res.status(400).send("Error: must provide coin_num, lat, long and title")
     return;
   }
 
   let client = null;
-  try {
-    client = await pool.connect();
-  } catch (error) {
-      error('A client pool error occurred:' + error);
-      return error;
-  }
+  client = await pool.connect().catch(err => {error(err)});
 
   let chime;
   try {
@@ -214,12 +209,12 @@ app.post("/addChime", async function(req, res){
     // add receiver (not required); check receiver name and email v database
     let receiver;
     if (req.body.receiver || req.body.email){
-      receiver = await client.query(isUserNameEmail, [req.body.receiver, req.body.email || 'null']).catch(err => {error(err)});
+      receiver = await client.query(isUserNameEmail, [req.body.receiver || 'null', req.body.email || 'null']).catch(err => {error(err)});
       if (receiver.rowCount == 1) {
         receiver = receiver['rows'][0]['id'];
       }
       else {
-        const inserted_receiver = await client.query(insertUser, [req.body.receiver, req.body.email ? req.body.email : 'null', 'FALSE']).catch(err => {error(err)});
+        const inserted_receiver = await client.query(insertUser, [req.body.receiver ? req.body.receiver : 'null', req.body.email ? req.body.email : 'null', 'FALSE']).catch(err => {error(err)});
         if (inserted_receiver.rowCount == 1){
           receiver = inserted_receiver['rows'][0]['id'];
         }
@@ -285,7 +280,7 @@ app.post("/addChime", async function(req, res){
   else {
     await rollback(client);
     console.log('test query rolled back');
-    res.send(context['rows']);
+    res.status(200).send(context['rows']);
   }
 }
   catch (error) {
@@ -295,7 +290,7 @@ app.post("/addChime", async function(req, res){
     } catch (rollbackError) {
       error('A rollback error occurred:' + rollbackError);
     }
-    res.send('An error adding a chime occurred that triggered the catch: ' + error);
+    res.status(500).send('An error occurred while processing: ' + error);
   } finally {
     client.release();
   }
@@ -315,65 +310,56 @@ app.post("/addChime", async function(req, res){
 app.post("/addAmbassador", async function(req, res){
   if (!req.body.name || 
     !req.body.email) {
-    res.send("Error: must provide name and email to become ambassador")
+      res.status(400).send("Error: must provide name and email to become ambassador")
     return;
   }
 
-  let client = null;
-  try {
-    client = await pool.connect();
-  } catch (error) {
-      error('A client pool error occurred:' + error, res);
-      return error;
-  }
+  let client = await pool.connect().catch(err => {error(err)});
 
   let ambassador
   try {
-    await client.query('BEGIN');
+    await client.query('BEGIN').catch(err => {error(err)});
 
     // only check emails because we don't want to overwrite someone who has the same name
-    ambassador = await client.query(isUserEmail, [req.body.email]);
-    console.log(ambassador.rows);
+    ambassador = await client.query(isUserEmail, [req.body.email]).catch(err => {error(err)});
     
     if (ambassador.rowCount == 1 && ambassador.rows['is_ambassador'] == 'FALSE'){
       if (!req.body.phone){
-        ambassador = await client.query(updateAmbassador, [ambassador.rows['id'], 'TRUE', req.body.name, req.body.email]);
+        ambassador = await client.query(updateAmbassador, [ambassador.rows['id'], 'TRUE', req.body.name, req.body.email]).catch(err => {error(err)});
       }
       else {
-        ambassador = await client.query(updateAmbassadorWithPhone, [ambassador.rows['id'], 'TRUE', req.body.name, req.body.email, req.body.phone]);
+        ambassador = await client.query(updateAmbassadorWithPhone, [ambassador.rows['id'], 'TRUE', req.body.name, req.body.email, req.body.phone]).catch(err => {error(err)});
       }
     }
     else if (ambassador.rowCount == 0) {
-      ambassador = await client.query(insertUserWithPhone, [req.body.name, req.body.email, req.body.phone || 'null', 'TRUE']);
+      ambassador = await client.query(insertUserWithPhone, [req.body.name, req.body.email, req.body.phone || null, 'TRUE']).catch(err => {error(err)});
+    }
+      
+    if (ambassador.rowCount != 1){
+      error("Error: couldn't submit ambassador");
+    }
+
+    if (!req.body.test){
+      await client.query('COMMIT');
+      res.send(ambassador['rows']);
+    }
+    else {
+      await rollback(client);
+      console.log('test query rolled back');
+      res.send(ambassador['rows']);
     }
 
   } catch(error) {
       try {
           await client.query('ROLLBACK');
         } catch (rollbackError) {
-          error('A rollback error occurred:' + rollbackError, res);
+          error('A rollback error occurred:' + rollbackError);
         }
-        error('An error adding a chime occurred that triggered the catch: ' + error, res);
+        res.status(500).send('An error occurred while processing: ' + error);
   } finally {
-    const context = await client.query(get_chime, [chime]);
-      
-    if (context.rowCount != 1){
-      error("Error: couldn't retrieve new chime", res);
-    }
-
-    if (!req.body.test){
-      await client.query('COMMIT');
-      res.send(context['rows']);
-    }
-    else {
-      await rollback(client);
-      console.log('test query rolled back');
-      res.send(context['rows']);
-    }
     client.release();
   }
 });
-
 
 /************************ Query Execution Functions **************************/
 
@@ -382,6 +368,7 @@ async function rollback(client) {
     await client.query('ROLLBACK');
   } catch (rollbackError) {
     console.error('A rollback error occurred:', rollbackError);
+    throw rollbackError;
   }
 }
 
