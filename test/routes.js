@@ -227,11 +227,22 @@ describe ("addChime handle", () => {
       });
   });
 
-  it ("should return expected body with receiver email", (done) => {
+  it ("should return expected body with receiver email and name", (done) => {
     chai.request('http://localhost:3500')
       .post('/addChime')
       .set('content-type', 'application/x-www-form-urlencoded')
       .send({'coin_num': 'testy test', 'lat': '123', 'long': '456', 'title': 'Testing post', 'receiver': 'Blarg', 'email': 'casper@boo.com', 'test': 'true'})
+      .end(function (err, res) {
+        expect(res.text).to.equal(response4);
+        done();
+      });
+  });
+
+  it ("should return expected body with receiver email", (done) => {
+    chai.request('http://localhost:3500')
+      .post('/addChime')
+      .set('content-type', 'application/x-www-form-urlencoded')
+      .send({'coin_num': 'testy test', 'lat': '123', 'long': '456', 'title': 'Testing post', 'email': 'casper@boo.com', 'test': 'true'})
       .end(function (err, res) {
         expect(res.text).to.equal(response4);
         done();
@@ -258,5 +269,35 @@ describe ("addChime handle", () => {
         expect(res.text).to.equal(response6);
         done();
       });
+  });
+});
+
+describe ("addAmbassador handle", () => {
+  const response1 = '[{"coin_num":"testy test","title":"Testing post","description":"null","image":"null","latitude":"123","longitude":"456"}]';
+  const response2 = '[{"coin_num":"testy test","title":"Testing post","description":"null","image":"null","latitude":"123","longitude":"456"}]';
+  const response3 = '[{"coin_num":"testy test","title":"Testing post","description":"null","image":"null","latitude":"123","longitude":"456"}]';
+  const response4 = '[{"coin_num":"testy test","title":"Testing post","description":"null","image":"null","latitude":"123","longitude":"456"}]';
+  const response5 = '[{"coin_num":"testy test","title":"Testing post","description":"lawdy","image":"null","latitude":"123","longitude":"456"}]';
+  const response6 = '[{"coin_num":"testy test","title":"Testing post","description":"null","image":"dude.png","latitude":"123","longitude":"456"}]';
+  it ("should return 200 with name and email", (done) => {
+    chai.request('http://localhost:3500')
+        .post('/addAmbassador')
+        .type('form')
+        .send({'name': 'testy test', 'email': 'casper@boo.com', 'test': 'true'})
+        .end(function (err, res) {
+          expect(res.status).to.equal(200);
+          done();
+        });
+  });
+
+  it ("should return expected body with name and email", (done) => {
+    chai.request('http://localhost:3500')
+        .post('/addAmbassador')
+        .type('form')
+        .send({'name': 'testy test', 'email': 'casper@boo.com', 'test': 'true'})
+        .end(function (err, res) {
+          expect(res.text).to.equal(response1);
+          done();
+        });
   });
 });
